@@ -1,0 +1,3 @@
+.hermes-openui-original { isolation:isolate; color:var(--ui-text-primary); font-size:14px; }
+.hermes-openui-original iframe {max-width:100%;}
+.hermes-openui-original * {box-sizing:border-box;}
