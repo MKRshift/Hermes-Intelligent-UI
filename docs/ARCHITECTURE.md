@@ -7,8 +7,8 @@ The only practical direct solution is to render full OpenUI Lang at the Hermes M
 A companion plugin injects language instructions and a composer toggle, but does not import third-party React dependencies. Hermes runtime plugins allow imports only from `react`, `react/jsx-runtime` and the official SDK, which is why v0.6 could not directly use the original runtime.
 
 ## Trust and functionality
-- Only assistant-originated fenced OpenUI blocks are intended to become interactive; Hermes currently uses the same Markdown component for user and assistant text, so this patch also renders OpenUI blocks in local message bodies, except scratchpad/previewOnly; **do not use untrusted shared history with this experimental patch**.
+- Only the normal assistant transcript opts into OpenUI. Scratchpads, foreign previews and transcript surfaces that disable artifacts leave fences as code.
 - Thesys HtmlView remains inside a sandboxed iframe with CSP. Components and tool providers are trusted code; the model generates declarative OpenUI Lang.
 - External image search and routing APIs from the Next.js app are absent. Their hooks will gracefully fall back, but are not integrated.
 - Real `@ToAssistant` inserts draft text to the originating session; it does not send automatically.
-- Native macOS validation is required after dependency install.
+- The [validation record](VALIDATION.md) describes what was tested on macOS.

@@ -73,6 +73,3 @@ export const library = createLibrary({
   actions,
   componentGroups: baseComponentGroups,
 });
-
-// The CLI (npm run prompt) picks up these exports by name.
-export { dashboardPromptOptions, promptOptions } from "./prompt-options";

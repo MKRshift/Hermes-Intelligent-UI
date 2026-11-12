@@ -1,6 +1,6 @@
 # Hermes Intelligent UI: next architecture
 
-Planning audit, 12 November 2026. This is a proposal, not a completed integration.
+Planning audit, 12 November 2026. Findings below describe the original v0.7.0 archive. See [validation](VALIDATION.md) for progress on the pinned source build.
 
 ## Decision
 
@@ -54,4 +54,4 @@ Actions have an explicit allowlist and typed payloads. Continue-conversation ins
 
 ## Working alongside the other version
 
-`main` preserves the supplied source baseline. `work/codex` contains this audit and project setup. Runtime changes are deliberately deferred until the other in-progress version can be compared. Bring that version onto a separate branch, compare bridge, installer, prompts and service changes, then implement the first milestone without replacing either version wholesale.
+`main` preserves the supplied source baseline. `work/codex` contains the audit and pinned source build. Bring the other version onto a separate branch, compare the bridge, installer, prompts and service changes, then integrate compatible changes before changing the UI state format.

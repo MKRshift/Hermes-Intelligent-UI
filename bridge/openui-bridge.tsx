@@ -1,3 +1,5 @@
+import './openui-styles.css'
+
 import { Renderer, type ActionEvent } from '@openuidev/react-lang'
 import { host } from '@hermes/plugin-sdk'
 import { useStore } from '@nanostores/react'

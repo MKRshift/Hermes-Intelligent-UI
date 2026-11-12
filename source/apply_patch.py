@@ -1,73 +1,141 @@
 #!/usr/bin/env python3
-"""Apply full upstream Thesys OpenUI renderer to a Hermes Desktop SOURCE checkout.
-Idempotent within supported anchor constraints; never patch an installed signed binary.
-"""
+"""Install or remove the OpenUI source overlay on the pinned Hermes checkout."""
+import argparse
+import hashlib
+import json
 from pathlib import Path
-import sys, os, json, shutil, datetime, re
+import shutil
+import subprocess
 
-ROOT=Path(__file__).resolve().parents[1]
-SOURCE=ROOT/'vendor/thesys-lib'
-if len(sys.argv)<2:
-    raise SystemExit('Usage: python3 source/apply_patch.py /path/to/hermes-agent')
-repo=Path(sys.argv[1]).expanduser().resolve()
-entry=repo/'apps/desktop/src/components/assistant-ui/markdown-text.tsx'
-manifest=repo/'apps/desktop/package.json'
-if not entry.is_file() or not manifest.is_file():
-    raise SystemExit('Not a Hermes Agent source checkout. Expected apps/desktop/src/components/assistant-ui/markdown-text.tsx')
-orig=entry.read_text()
-if 'HermesOpenUI' in orig:
-    print('OpenUI renderer already integrated. No duplicate patch applied.')
-    raise SystemExit(0)
-needle="import { ArtifactCard } from './artifact-card'"
-if orig.count(needle)!=1 or orig.count('SyntaxHighlighter: (props: SyntaxHighlighterProps) => {')!=1:
-    raise SystemExit('Incompatible Hermes version. No changes made; check docs/ARCHITECTURE.md.')
-backup=repo/'.hermes-openui-backups'/datetime.datetime.now().strftime('%Y%m%d-%H%M%S')
-backup.mkdir(parents=True,exist_ok=True)
-shutil.copy2(entry,backup/'markdown-text.tsx')
-shutil.copy2(manifest,backup/'package.json')
-new=orig.replace(needle,"import { HermesOpenUI } from './openui-bridge'\n"+needle)
-slot='SyntaxHighlighter: (props: SyntaxHighlighterProps) => {'
-replacement="""SyntaxHighlighter: (props: SyntaxHighlighterProps) => {
-          // Source-level integration: OpenUI Lang is rendered with the genuine
-          // @openuidev/react-lang runtime and original Thesys component library.
-          // Foreign chat previews and scratchpads NEVER execute these widgets.
-          if (!previewOnly && !scratchpad && /^(openui|openui-lang|oui)$/i.test(props.language || '')) {
-            return <HermesOpenUI response={props.code} isStreaming={isStreaming} />
-          }
-"""
-new=new.replace(slot,replacement)
-if new==orig or new.count('HermesOpenUI')!=2:
-    raise SystemExit('Unable to patch Hermes markdown renderer. Backup at '+str(backup))
-bridge_dest=entry.parent/'openui-bridge.tsx'
-lib_dest=repo/'apps/desktop/src/components/assistant-ui/thesys-lib'
-if bridge_dest.exists() or lib_dest.exists():
-    raise SystemExit('Existing OpenUI files detected. No replacement performed. Restore originals or back them up first.')
-try:
-    shutil.copytree(SOURCE,lib_dest)
-    shutil.copy2(ROOT/'bridge/openui-bridge.tsx',bridge_dest)
-    # CSS is imported by bridge component; custom source library imports its own CSS.
-    bridge_content=bridge_dest.read_text()
-    bridge_dest.write_text("import './openui-styles.css'\n"+bridge_content)
-    shutil.copy2(ROOT/'bridge/openui-styles.css',entry.parent/'openui-styles.css')
-    entry.write_text(new)
-    data=json.loads(manifest.read_text())
-    for name, version in {
-        '@openuidev/react-lang':'^1.0.0',
-        '@openuidev/lang-core':'^1.0.0',
-        'zod':'^4.4.3',
-        'maplibre-gl':'^6.13.0',
-    }.items():
-        data.setdefault('dependencies',{})[name]=version
-    manifest.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
-    (backup/'check.txt').write_text(f'Original markdown-text.tsx and package.json.\nCheckout: {repo}\n')
-    (backup/'restore.command').write_text('#!/bin/bash\nset -euo pipefail\ncp "'+str(backup/'markdown-text.tsx')+'" "'+str(entry)+'"\ncp "'+str(backup/'package.json')+'" "'+str(manifest)+'"\nrm -f "'+str(bridge_dest)+'" "'+str(entry.parent/'openui-styles.css')+'"\nrm -rf "'+str(lib_dest)+'"\necho "Source restored. Run pnpm install to resolve the original lockfile."\n')
-    os.chmod(backup/'restore.command',0o755)
-    print('Applied real OpenUI source integration. Backup:',backup)
-    print('Next: cd',repo,'&& pnpm install --no-frozen-lockfile && cd apps/desktop && pnpm run dev')
-except BaseException:
-    entry.write_text(orig)
-    shutil.copy2(backup/'package.json',manifest)
-    shutil.rmtree(lib_dest,ignore_errors=True)
-    for f in [bridge_dest,entry.parent/'openui-styles.css']:
-        f.unlink(missing_ok=True)
-    raise
+ROOT = Path(__file__).resolve().parents[1]
+DESKTOP = Path("apps/desktop")
+TRANSCRIPT = DESKTOP / "src/components/assistant-ui"
+RECEIPT = Path(".hermes-openui-install")
+
+
+def git(repo, *args):
+    result = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    if result.returncode:
+        raise ValueError(result.stderr.strip() or "Git could not apply the source overlay.")
+    return result.stdout.strip()
+
+
+def digest(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def payload():
+    yield ROOT / "bridge/openui-bridge.tsx", TRANSCRIPT / "openui-bridge.tsx"
+    yield ROOT / "bridge/openui-styles.css", TRANSCRIPT / "openui-styles.css"
+    lib = ROOT / "vendor/thesys-lib"
+    for source in sorted(lib.rglob("*")):
+        if source.is_file():
+            yield source, TRANSCRIPT / "thesys-lib" / source.relative_to(lib)
+    yield ROOT / "vendor/LICENSE-THESYS.txt", TRANSCRIPT / "thesys-lib/LICENSE-THESYS.txt"
+
+
+def patch(repo, patch_file, *, reverse=False, check=False):
+    args = ["apply"]
+    if reverse:
+        args.append("--reverse")
+    if check:
+        args.append("--check")
+    git(repo, *args, str(patch_file))
+
+
+def install(repo):
+    revision = (ROOT / "source/hermes-revision.txt").read_text().strip()
+    if git(repo, "rev-parse", "--show-toplevel") != str(repo) or git(repo, "rev-parse", "HEAD") != revision:
+        raise ValueError(f"Expected a dedicated Hermes source checkout at {revision}.")
+    patch_file = ROOT / "source/hermes-desktop.patch"
+    receipt = repo / RECEIPT
+    files = {str(target): digest(source) for source, target in payload()}
+    if receipt.exists():
+        installed = verify(repo)
+        if files != installed or digest(patch_file) != digest(receipt / "overlay.patch"):
+            raise ValueError("A different OpenUI overlay is installed. Remove it before upgrading.")
+        print("OpenUI is already installed and verified.")
+        return
+    for target in files:
+        dest = repo / target
+        if dest.exists() or dest.is_symlink():
+            raise ValueError(f"Existing file conflicts with OpenUI: {target}")
+    patch(repo, patch_file, check=True)
+
+    copied = []
+    applied = False
+    receipt.mkdir()
+    try:
+        shutil.copyfile(patch_file, receipt / "overlay.patch")
+        for source, target in payload():
+            dest = repo / target
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with dest.open("xb") as output:
+                copied.append(target)
+                output.write(source.read_bytes())
+        patch(repo, receipt / "overlay.patch")
+        applied = True
+        (receipt / "files.json").write_text(json.dumps(files, indent=2) + "\n")
+    except BaseException:
+        if applied:
+            patch(repo, receipt / "overlay.patch", reverse=True)
+        remove_payload(repo, copied)
+        shutil.rmtree(receipt)
+        raise
+    print("OpenUI source and locked dependencies applied.")
+
+
+def verify(repo):
+    receipt = repo / RECEIPT
+    if not receipt.is_dir():
+        raise ValueError("No managed OpenUI overlay found.")
+    files = json.loads((receipt / "files.json").read_text())
+    for target, expected in files.items():
+        dest = repo / target
+        if dest.is_symlink() or not dest.is_file() or digest(dest) != expected:
+            raise ValueError(f"Installed file is missing or changed: {target}")
+    patch(repo, receipt / "overlay.patch", reverse=True, check=True)
+    return files
+
+
+def remove_payload(repo, targets):
+    for target in targets:
+        dest = repo / target
+        dest.unlink()
+        parent = dest.parent
+        while parent != repo / TRANSCRIPT and not any(parent.iterdir()):
+            parent.rmdir()
+            parent = parent.parent
+
+
+def restore(repo):
+    files = verify(repo)
+    receipt = repo / RECEIPT
+    patch(repo, receipt / "overlay.patch", reverse=True)
+    remove_payload(repo, files)
+    shutil.rmtree(receipt)
+    print("Original Hermes source and lockfile restored.")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("checkout", type=Path)
+    action = parser.add_mutually_exclusive_group()
+    action.add_argument("--restore", action="store_true")
+    action.add_argument("--verify", action="store_true")
+    args = parser.parse_args()
+    repo = args.checkout.expanduser().resolve()
+    try:
+        if args.verify:
+            verify(repo)
+            print("OpenUI source overlay verified.")
+        elif args.restore:
+            restore(repo)
+        else:
+            install(repo)
+    except (OSError, ValueError) as exc:
+        parser.exit(1, f"{exc}\n")
+
+
+if __name__ == "__main__":
+    main()
