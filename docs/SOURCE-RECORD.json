@@ -1,0 +1,11 @@
+{
+  "archive": "Hermes_OpenUI_TrueRenderer_Source_v0.7.0.zip",
+  "sha256": "7b0f4a5710290564024b9d4123aa1bb61d9a6f30a261e2ce771704765f1f89a3",
+  "audit_date": "2026-11-12",
+  "references": {
+    "CopilotKit/OpenIntelligentUI": "8391a94c1c3939c679e40ddd7bfc08a9ef690e70",
+    "thesysdev/open-intelligent-ui": "eb61ae359de0fb26ceb1aa21b1eacb573bc52bbd",
+    "NousResearch/hermes-agent": "e3bf4be5df04cf72dab4914b073361c71af1dbe1"
+  },
+  "note": "Reference snapshots inspected during planning; not verified provenance commits for archive vendor files."
+}

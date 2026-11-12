@@ -1,3 +1,16 @@
+# Hermes Intelligent UI
+
+Experimental inline interactive UI for Hermes Desktop. Source baseline: v0.7.0.
+
+- [Architecture audit and roadmap](docs/NEXT-ARCHITECTURE.md)
+- [Validation and current limits](docs/VALIDATION.md)
+- [Source provenance](docs/SOURCE-RECORD.json)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+
+Development planning is on `work/codex`; the supplied baseline is preserved in Git history. This is not a verified release or a claim of parity with either reference project. First-party contributions use MIT; upstream notices remain intact.
+
+---
+
 # Hermes × Thesys Open Intelligent UI — v0.7.0 source integration
 
 **This is a different architecture from v0.1–0.6.** v0.6 used a custom partial renderer. v0.7 embeds the real `@openuidev/react-lang` runtime and copies the original Thesys component definitions into a Hermes Desktop **source checkout**, then handles fenced `openui` blocks in the normal transcript. The composer toggle remains a Hermes Desktop plugin. The user-supplied source was taken from `Archive(4).zip`, open-intelligent-ui-main.
