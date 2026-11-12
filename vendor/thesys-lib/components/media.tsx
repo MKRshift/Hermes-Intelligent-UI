@@ -76,15 +76,15 @@ function useImageSearch(query: string | null): string[] | undefined {
   return query && result?.query === query ? result.images : undefined;
 }
 
-type PhotoProps = { query: string; src?: string | null; aspectRatio?: number | null; radius?: unknown; fit?: string | null };
+type PhotoProps = { query: string; src?: string | null; aspectRatio?: number | null; radius?: unknown; fit?: string | null; search?: boolean };
 
 /** A photo from src, or, without one or when it fails, the best search result for query. */
-function Photo(props: PhotoProps) {
+export function Photo(props: PhotoProps) {
   const alt = typeof props.query === "string" ? props.query.trim() : "";
   const src = webUrl(props.src);
   const [failed, setFailed] = useState<string[]>([]);
   const [loaded, setLoaded] = useState<string | null>(null);
-  const needSearch = (!src || failed.includes(src)) && alt.length > 2;
+  const needSearch = props.search !== false && (!src || failed.includes(src)) && alt.length > 2;
   const found = useImageSearch(needSearch ? alt : null);
   const current = [src, ...(found ?? [])].find((url): url is string => !!url && !failed.includes(url));
   const settled = !current && (!needSearch || found !== undefined);
@@ -94,7 +94,7 @@ function Photo(props: PhotoProps) {
       className={cx("iui-image", props.fit === "contain" && "is-contain", loaded === current && "is-loaded")}
       style={{ aspectRatio: ratio, borderRadius: radius(props.radius ?? "lg") }}
       role={current ? undefined : "img"}
-      aria-label={current ? undefined : alt}
+      aria-label={current ? undefined : alt || "Image unavailable"}
     >
       {current ? (
         <img

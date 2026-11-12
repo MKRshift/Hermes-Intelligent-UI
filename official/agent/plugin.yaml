@@ -1,0 +1,8 @@
+name: hermes-intelligent-ui
+version: 0.8.0
+description: Publish declarative OpenUI answers into Hermes Desktop.
+provides_tools:
+  - openui_show
+provides_hooks:
+  - pre_llm_call
+  - transform_llm_output

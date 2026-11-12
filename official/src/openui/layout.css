@@ -1,0 +1,37 @@
+.hermes-openui-answer {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: 44rem;
+  min-inline-size: 0;
+  margin: 1rem auto;
+  text-align: start;
+}
+
+.hermes-openui-answer:has(.iui-chart) {
+  max-inline-size: 52rem;
+}
+
+/* Expand for content that benefits from the room, within the chat pane. */
+.hermes-openui-answer:has(
+  .iui-grid[data-iui-columns]:not([data-iui-columns="1"], [data-iui-columns="2"]) > :nth-child(3),
+  .iui-table th:nth-child(5),
+  .iui-map-surface
+) {
+  max-inline-size: 62rem;
+}
+
+/* Photo grids read as a strip of images, without a second frame around each. */
+.hermes-openui-answer .iui-grid > .iui-card:has(> .iui-image:first-child) {
+  border: 0;
+  background: none;
+  padding: 0;
+}
+
+.hermes-openui-answer .iui-grid > .iui-card > .iui-image + .iui-caption {
+  margin-block-start: .375rem;
+}
+
+.hermes-openui-answer .iui-image > img {
+  /* Override the host's Markdown image margins inside the photo frame. */
+  margin: 0 !important;
+}

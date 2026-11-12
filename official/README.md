@@ -1,47 +1,33 @@
 # Native Hermes Desktop plugin
 
-Install with [Install_Native_Hermes_UI.command](../Install_Native_Hermes_UI.command), then use the **Intelligent UI** control in your existing Hermes composer. If necessary, open the Command Palette and choose **Reload desktop plugins**. Off keeps normal chat; Auto and Visual add instructions for native widgets.
+Run the [installer](../Install_Native_Hermes_UI.command) and choose **Intelligent UI · Visual** in your installed Hermes composer. For the most reliable generation, install the publishing tool into the profile you use:
 
-The previous composer-only plugin asked for OpenUI Lang code. Official Hermes renders the supported transcript directive, not arbitrary OpenUI source, so the code appeared as text. The native plugin keeps all 22 v0.6.0 widget kinds and adds recipes. The composer supplies examples for the requested features so the model can emit the matching `::intui` directives. Recipe cards use ordinary Hermes controls for serving counts, ingredient amounts, and checklists; their data cannot execute model-written code.
+```sh
+./Install_Native_Hermes_UI.command --agent-profile ollama
+```
 
-The instructions are appended as attached context using Hermes's existing transcript convention. Some Hermes builds may show that context in the live user bubble or title before the conversation is reopened. The model still decides what to write: plain text stays plain text, and invalid directives can fall back to source or an error. Previously saved raw replies are not rewritten. The plugin does not add the full OpenUI Lang runtime to the official app.
+Replace `ollama` with the profile name if needed. Start a new chat after enabling the tool. If the composer does not show Intelligent UI, choose **Reload desktop plugins** from the command palette.
 
-The full native catalog covers:
+- **Off** uses regular Hermes chat.
+- **Auto** uses the original `::intui` catalog, including all 23 widget kinds, [reactive layouts](TREE_FORMAT.md), and saved forms.
+- **Visual** runs the OpenUI Lang renderer and the original Thesys layouts, controls, tables, charts, SVG, and image components. The model writes a fresh program for each request. Answers are centered in the chat; dense tables and galleries can widen, and grids reflow in narrow panes. Controls share state, and a follow-up button can prepare a draft in the originating chat. **Widget examples** remains available in every mode.
 
-- Charts and data: bars, line, donut, scatter, sparkline, gauge, progress, metrics, key/value pairs, and filterable tables.
-- Explanations: cards, steps, timelines, diagrams, accordions, and notices.
-- Interactive tools: calculators, weighted comparisons, checklists, tabs, options, and recipes.
-- [Composed layouts](TREE_FORMAT.md): shared inputs, calculated values, conditional sections, nested tabs, validated forms, draft actions, and opt-in saved inputs.
+Try “Make a workshop quote for 4 boards at 85 NOK each with a quantity slider, a live total, and a cost breakdown.” Or ask for an adjustable recipe, a dashboard with filters, or a photo gallery.
 
-The [static OpenUI converter](OPENUI_COMPAT.md) is also available. It translates the supported literal subset into native widgets.
+Visual mode uses Hermes's transcript SDK. The composer gives the model the component syntax and the profile's `openui_show` tool publishes the program to the current turn. A short directive mounts the renderer, and the saved assistant message keeps the full data-only program for replay. When the model emits the transport directly, the renderer can use its streamed data; the publishing tool delivers its completed program with the final reply. No app binary or Hermes source tree is modified.
 
-## Try it
-
-Click **Widget examples** beside the composer, or type `/intui-examples`. The panel uses built-in data and renders the same components as chat replies. It needs no model, leaves the chat unchanged, and is available in every mode. A plain request such as “show me examples of Intelligent UI” also opens it locally. Example draft buttons show a notification instead of changing the composer.
-
-For model-generated widgets in **Auto** or **Visual**, try:
-
-- **Chart:** “Plot weekly totals 8, 12, and 10 in a native line chart.”
-- **Comparison:** “Build an adjustable comparison matrix for two options. A has cost score 8 and quality score 6; B has cost score 6 and quality score 9. Start with weights 2 and 3.”
-- **Reactive layout:** “Make a native quote with quantity and material controls, a live total, and a breakdown tab. Use 12 NOK per PLA part and 20 NOK per PETG part.”
-- **Form:** “Create a native project form with a required project name and deadline, optional notes, and a button to prepare a draft.”
-- **Recipe:** “Make a vanilla cake recipe with adjustable servings and a checklist.”
+This integration supports direct HTTPS photos. The Thesys demo's image search and map services, custom HTML, and embedded video are outside the native OpenUI library. Invalid programs may still need regeneration, and old bare source replies are unchanged. OpenUI control state is kept in the current app window.
 
 ## Development
 
-Develop with Node 22+. Edit the modules under `src/` (composer catalog, widget families, layout rendering, layout state, and shared helpers). The build writes the single `plugin.js` that Hermes loads; the installer uses this bundled file and requires no developer dependencies.
+Use Node 22 or later. The build bundles the modules in `src/` and the OpenUI renderer into `plugin.js`; the desktop install does not require a build environment. Agent code is under `agent/`.
 
 ```sh
 npm --prefix official ci
 npm --prefix official run build
 npm --prefix official test
-./Install_Native_Hermes_UI.command
+python3 -m unittest discover -s tests -v
+./Install_Native_Hermes_UI.command --agent-profile ollama
 ```
 
-To verify all catalog examples against Hermes's parser, run `node --experimental-vm-modules tests/test_native_plugin.mjs /path/to/transcript-directives.ts` using the parser under `apps/desktop/src/lib/` in the Hermes checkout.
-
-Verified on 12 November 2026 in the installed Hermes Desktop v0.23.1 with its existing local Hermes Brain model. In a new chat, the prompt `create a cake recipie` in Visual mode produced a **Simple Vanilla Cake** card. Increasing servings from 8 to 9 changed flour from 250 g to 281.25 g. The local regression check also verifies checking and resetting items.
-
-The expanded catalog passed parser and rendering checks for all 23 kinds, plus the recovered v0.6.0 tests for linked state, forms, saved inputs, and the converter. An existing recipe still rendered in Hermes after installing the modular build. Fresh line-chart and mixed-widget prompts were attempted in the installed app, but the local Ollama runner logged a GPU error and returned empty streams; live generation of those prompts was not verified.
-
-The examples panel was verified in the installed app. The interactive quote changed from 36 NOK to 48 NOK when the parts slider moved from 3 to 4. The gallery also covers the cases where a model writes files or emits malformed directives instead of showing an example. The panel and generated replies are separate paths; the model still controls what goes into its replies.
+Tests cover legacy widgets, long and streamed OpenUI programs, rendering with the actual OpenUI engine, and restoring cards from saved assistant messages. To check the old catalog with Hermes's actual parser, pass its `apps/desktop/src/lib/transcript-directives.ts` to `tests/test_native_plugin.mjs` with Node's `--experimental-vm-modules` flag. The [static converter](OPENUI_COMPAT.md) is still available for literal legacy imports.

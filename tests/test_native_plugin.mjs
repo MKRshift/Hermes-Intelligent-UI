@@ -1,3 +1,4 @@
+import { jsxExports, reactExports } from './desktop/react-shim.mjs'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createContext, SourceTextModule, SyntheticModule } from 'node:vm'
@@ -21,14 +22,12 @@ shim('@hermes/plugin-sdk', {
   TRANSCRIPT_DIRECTIVE_AREA: 'transcript.directives',
   host: { notify() {}, composer: { insertText: (...args) => { draftWrites.push(args); return true } } }
 })
-shim('react/jsx-runtime', { jsx, jsxs: jsx })
-shim('react', {
-  useState(initial) {
+shim('react/jsx-runtime', jsxExports(jsx))
+shim('react', reactExports(function useState(initial) {
     const index = stateIndex++
     if (!(index in state)) state[index] = typeof initial === 'function' ? initial() : initial
     return [state[index], next => { state[index] = typeof next === 'function' ? next(state[index]) : next }]
-  }
-})
+}))
 const code = readFileSync(new URL('../official/plugin.js', import.meta.url), 'utf8')
 const plugin = new SourceTextModule(code, { context })
 await plugin.link(name => modules[name])

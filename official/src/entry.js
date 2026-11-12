@@ -4,6 +4,9 @@ import { pluginContext, setPluginContext, ACCENT, MUTED, BORDER, btn } from './s
 import { renderDirective } from './render.js'
 import { galleryOpen, isGalleryRequest, GalleryButton, GalleryPanel } from './gallery.js'
 import { NATIVE_MARKER, nativeInstructions } from './catalog.js'
+import { OPENUI_MARKER, openUIInstructions } from './openui/prompt.js'
+import { registerOpenUITransport } from './openui/transport.js'
+import { installOpenUIStyles, renderOpenUI } from './openui/view.tsx'
 
 const ID = 'hermes-intelligent-ui'
 const { host, COMPOSER_AREAS, TRANSCRIPT_DIRECTIVE_AREA, atom, useValue } = sdk
@@ -42,6 +45,7 @@ export default {
     } else if (typeof COMPOSER_AREAS?.bottom==='string') {
       ctx.register({id:'composer-mode-button',area:COMPOSER_AREAS.bottom,order:85,render:()=>jsx(Toggle,{})})
     }
+    const hasOpenUI = typeof TRANSCRIPT_DIRECTIVE_AREA === 'string' && typeof sdk.useTheme === 'function' && !!host.state?.focusedStoredSessionId && typeof ctx.onEvent === 'function'
     const hasGallery = typeof COMPOSER_AREAS?.top === 'string' && typeof COMPOSER_AREAS?.actions === 'string'
     if (hasGallery) {
       ctx.register({ id: 'widget-examples-button', area: COMPOSER_AREAS.actions, order: 86, render: () => jsx(GalleryButton, {}) })
@@ -51,13 +55,17 @@ export default {
       ctx.register({id:'composer-ui-instructions',area:COMPOSER_AREAS.middleware,data:{
         handler(draft) {
           if (!draft || typeof draft.text !== 'string') return draft
-          if (hasGallery && !draft.attachments?.length && isGalleryRequest(draft.text)) {
+          if (hasGallery && (mode.get() !== 'visual' || /^\s*\/intui-examples\s*$/i.test(draft.text)) && !draft.attachments?.length && isGalleryRequest(draft.text)) {
             galleryOpen.set(true)
             // Null cancels the send without clearing the user's draft in Hermes.
             return null
           }
           if (mode.get()==='off') return draft
-          if (!draft.text.trim() || /^\s*\//.test(draft.text) || draft.text.includes(NATIVE_MARKER)) return draft
+          if (!draft.text.trim() || /^\s*\//.test(draft.text) || draft.text.includes(NATIVE_MARKER) || draft.text.includes(OPENUI_MARKER)) return draft
+          if (mode.get() === 'visual' && hasOpenUI) {
+            const id = Array.from(crypto.getRandomValues(new Uint8Array(8)), n => n.toString(16).padStart(2, '0')).join('')
+            return { ...draft, text: draft.text + '\n\n--- Attached Context ---\n\n' + OPENUI_MARKER + ' ' + id + '\n' + openUIInstructions(id) }
+          }
           return { ...draft, text: draft.text + '\n\n--- Attached Context ---\n\n' + NATIVE_MARKER + '\n' + nativeInstructions(draft.text, mode.get()) }
         }
       }})
@@ -66,6 +74,11 @@ export default {
       ctx.register({id:'inline-ui-renderer',area:TRANSCRIPT_DIRECTIVE_AREA,data:{name:'intui',render:renderDirective}})
     } else {
       host.notify({kind:'warning',message:'This Hermes Desktop build lacks inline transcript directives. Update Hermes to use Intelligent UI.'})
+    }
+    if (hasOpenUI) {
+      installOpenUIStyles(ctx)
+      registerOpenUITransport(ctx)
+      ctx.register({ id: 'openui-renderer', area: TRANSCRIPT_DIRECTIVE_AREA, data: { name: 'openui', render: renderOpenUI } })
     }
     ctx.onDispose(()=>{setPluginContext(null);mode.set('off');galleryOpen.set(false)})
   }

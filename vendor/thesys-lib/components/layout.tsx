@@ -91,7 +91,7 @@ export const Col = defineComponent({
   ),
 });
 
-export const Grid = defineComponent({
+export const createGrid = (defaultMinChildWidth?: number) => defineComponent({
   name: "Grid",
   props: z.object({
     children,
@@ -104,10 +104,12 @@ export const Grid = defineComponent({
     const columns = Math.min(12, Math.max(1, Math.round(props.columns ?? 2)));
     const gap = space(props.gap) ?? "12px";
     // At most `columns` columns, each at least minChildWidth wide.
-    const min = props.minChildWidth ? `max(${Math.max(0, props.minChildWidth)}px, (100% - ${columns - 1} * ${gap}) / ${columns})` : null;
+    const childWidth = props.minChildWidth ?? defaultMinChildWidth;
+    const min = childWidth ? `max(${Math.max(0, childWidth)}px, (100% - ${columns - 1} * ${gap}) / ${columns})` : null;
     return (
       <div
         className="iui-grid"
+        data-iui-columns={columns}
         style={{
           gap,
           gridTemplateColumns: min ? `repeat(auto-fill, minmax(min(100%, ${min}), 1fr))` : `repeat(${columns}, minmax(0, 1fr))`,
@@ -118,6 +120,8 @@ export const Grid = defineComponent({
     );
   },
 });
+
+export const Grid = createGrid();
 
 export const Card = defineComponent({
   name: "Card",

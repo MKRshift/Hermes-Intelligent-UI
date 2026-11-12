@@ -3,10 +3,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/entry.js --bundle --format=esm --target=es2022 --external:@hermes/plugin-sdk --external:react --external:react/jsx-runtime --banner:js='// Generated from official/src. Run npm run build in official/.' --outfile=plugin.js",
+    "build": "node tools/build.mjs",
     "test": "for suite in ../tests/test_native_plugin.mjs ../tests/test-native-*.mjs; do node --experimental-vm-modules \"$suite\" || exit; done"
   },
   "devDependencies": {
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "dependencies": {
+    "@openuidev/lang-core": "1.0.0",
+    "@openuidev/react-lang": "1.0.0",
+    "lucide-react": "1.27.0",
+    "zod": "4.6.7"
   }
 }

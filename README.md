@@ -1,14 +1,14 @@
 # Hermes Intelligent UI
 
-Interactive answers inside the Hermes Desktop app you already use. The native plugin renders recipe cards, charts, tables, calculators and other inline controls.
+Interactive answers inside the Hermes Desktop app you already use. Visual mode runs the original Thesys OpenUI renderer with native chat controls, charts, tables, and galleries. Auto mode keeps the existing Hermes widget catalog.
 
 ## Use your installed Hermes app
 
-1. Run [Install_Native_Hermes_UI.command](Install_Native_Hermes_UI.command). The installer saves a copy of the previous plugin.
-2. In Hermes, open the Command Palette and choose **Reload desktop plugins** if the composer still shows **OpenUI** instead of **Intelligent UI**.
-3. Click **Widget examples** beside the composer to try any of the 23 native widget kinds without sending a message. For generated replies, select **Auto** or **Visual** and try one of the [example prompts](official/README.md#try-it).
+1. Run [Install_Native_Hermes_UI.command](Install_Native_Hermes_UI.command). For the native publishing tool, run `./Install_Native_Hermes_UI.command --agent-profile PROFILE` with the profile you use in Hermes.
+2. Choose **Intelligent UI · Visual** in the composer and start a new chat. If the button is missing, open the Command Palette and choose **Reload desktop plugins**.
+3. Try “Make a coffee order estimate with a quantity slider and live total.” **Widget examples** still opens the original 23 widgets without sending a message.
 
-This route uses Hermes’s native `::intui` widgets. A reply already saved as raw OpenUI Lang source will stay as written; send a fresh prompt with the native plugin active. No separate app or source build is needed.
+The installed Hermes app handles the chat and transcript. The plugin renders a model-generated OpenUI program inline; it does not require a separate app or a Hermes source build. Existing replies saved as bare source still display as originally written.
 
 - [Native plugin validation and troubleshooting](official/README.md)
 - [Architecture roadmap](docs/NEXT-ARCHITECTURE.md)
@@ -29,7 +29,7 @@ Enable **OpenUI · Thesys renderer** under Capabilities → Plugins, choose **Vi
 
 Run `./Restore_Hermes_Source.command` to remove the overlay from the source checkout. Restore reverses the Hermes source and dependency changes and refuses to overwrite conflicting edits.
 
-## Current limits
+## Source experiment limits
 
 - The original Thesys image search and street routing services are not available. Map tiles and direct image URLs depend on network access.
 - The Hermes model endpoint does not use Thesys Gateway's stream correction, so a model can still produce invalid OpenUI.

@@ -1,5 +1,6 @@
 // Hermes SDK mock integration for v0.4 reactive layout state.
 // Node --experimental-vm-modules tests/test-reactive.mjs
+import { jsxExports, reactExports } from './desktop/react-shim.mjs'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 import {SourceTextModule,SyntheticModule,createContext} from 'node:vm'
@@ -18,8 +19,11 @@ const context=createContext({console,Math,Number,Intl,JSON,String,Array,Object,D
 const source=readFileSync(new URL('../official/plugin.js',import.meta.url),'utf8')
 const main=new SourceTextModule(source+'\nexport { prepareLayoutState,computeLayoutState,resolveBindingText,bindAttrs,parseTree }',{context})
 const sm=new SyntheticModule(Object.keys(sdk),function(){for(const k of Object.keys(sdk))this.setExport(k,sdk[k])},{context})
-const jm=new SyntheticModule(['jsx','jsxs'],function(){this.setExport('jsx',jsx);this.setExport('jsxs',jsx)},{context})
-const rm=new SyntheticModule(['useState'],function(){this.setExport('useState',react.useState)},{context})
+function makeModule(exports) {
+  return new SyntheticModule(Object.keys(exports),function(){for(const k of Object.keys(exports))this.setExport(k,exports[k])},{context})
+}
+const jm=makeModule(jsxExports(jsx))
+const rm=makeModule(reactExports(react.useState))
 await main.link(k=>({'@hermes/plugin-sdk':sm,'react/jsx-runtime':jm,'react':rm}[k]))
 await main.evaluate()
 const {prepareLayoutState,computeLayoutState,resolveBindingText,bindAttrs,parseTree}=main.namespace
