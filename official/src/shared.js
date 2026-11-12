@@ -1,6 +1,7 @@
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { host } from '@hermes/plugin-sdk'
 
+const GALLERY_SESSION = '__hermes_intui_example__'
 let pluginContext = null
 function setPluginContext(ctx) { pluginContext = ctx }
 
@@ -74,6 +75,10 @@ function toGap(raw, defaultGap=10) {return Math.max(0,Math.min(32,number(raw,def
 function insertIntoChat(sessionId,text) {
   const message = clean(text,500)
   if (!message) return Promise.resolve(false)
+  if (sessionId === GALLERY_SESSION) {
+    host.notify({ kind: 'info', message: 'Example only. The chat draft was not changed.' })
+    return Promise.resolve(false)
+  }
   try {return Promise.resolve(host.composer.insertText(sessionId ?? null,message,{mode:'block'})).then(ok=>{
     if(!ok)host.notify({kind:'warning',message:'Open the source chat to add this to its composer.'})
     return ok
@@ -81,4 +86,4 @@ function insertIntoChat(sessionId,text) {
   catch {host.notify({kind:'error',message:'Could not insert the selected text.'});return Promise.resolve(false)}
 }
 
-export { pluginContext, setPluginContext, clean, cleanInput, parts, number, fnum, hash, COLOR, MUTED, ACCENT, BORDER, sub, btn, titleCss, rowCss, shell, empty, pill, safeExternalUrl, toGap, insertIntoChat }
+export { GALLERY_SESSION, pluginContext, setPluginContext, clean, cleanInput, parts, number, fnum, hash, COLOR, MUTED, ACCENT, BORDER, sub, btn, titleCss, rowCss, shell, empty, pill, safeExternalUrl, toGap, insertIntoChat }

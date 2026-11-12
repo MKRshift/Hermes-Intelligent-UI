@@ -1,6 +1,5 @@
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useState } from 'react'
-import { host } from '@hermes/plugin-sdk'
 import { clean, parts, number, fnum, hash, COLOR, MUTED, ACCENT, BORDER, sub, btn, rowCss, shell, empty, insertIntoChat } from './shared.js'
 import { validNumeric, safeFormula, parseCalcInputs } from './arithmetic.js'
 
@@ -120,8 +119,7 @@ function MatrixWidget({attrs,sessionId}){
   const rankings=options.map((option,i)=>({option,score:total>0?rows[i].reduce((s,x,j)=>s+x*weights[j],0)/total:null})).sort((a,b)=>(b.score??-1)-(a.score??-1))
   const copy=async()=>{
     const text=`Compare my selection: ${rankings.map(r=>`${r.option} ${r.score===null?'unrated':r.score.toFixed(2)+'/10'}`).join(', ')}. Criteria weights: ${criteria.map((c,i)=>`${c}=${weights[i]}`).join(', ')}.`
-    try{const ok=await host.composer.insertText(sessionId??null,text,{mode:'block'});if(!ok)host.notify({kind:'warning',message:'Open this chat to insert the ranking.'})}
-    catch{host.notify({kind:'error',message:'Cannot insert the comparison.'})}
+    await insertIntoChat(sessionId,text)
   }
   return shell(attrs,jsxs('div',{children:[
     jsx('div',{style:{...sub,marginBottom:11},children:'Adjust criterion weights (0–5). Scores are supplied by the answer, not recalculated.'}),

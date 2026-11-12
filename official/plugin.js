@@ -1,12 +1,13 @@
 // Generated from official/src. Run npm run build in official/.
 
 // src/entry.js
-import { jsx as jsx7, jsxs as jsxs6 } from "react/jsx-runtime";
+import { jsx as jsx9, jsxs as jsxs7 } from "react/jsx-runtime";
 import * as sdk from "@hermes/plugin-sdk";
 
 // src/shared.js
 import { jsx, jsxs } from "react/jsx-runtime";
 import { host } from "@hermes/plugin-sdk";
+var GALLERY_SESSION = "__hermes_intui_example__";
 var pluginContext = null;
 function setPluginContext(ctx) {
   pluginContext = ctx;
@@ -105,6 +106,10 @@ function toGap(raw, defaultGap = 10) {
 function insertIntoChat(sessionId, text) {
   const message = clean(text, 500);
   if (!message) return Promise.resolve(false);
+  if (sessionId === GALLERY_SESSION) {
+    host.notify({ kind: "info", message: "Example only. The chat draft was not changed." });
+    return Promise.resolve(false);
+  }
   try {
     return Promise.resolve(host.composer.insertText(sessionId ?? null, message, { mode: "block" })).then((ok) => {
       if (!ok) host.notify({ kind: "warning", message: "Open the source chat to add this to its composer." });
@@ -118,6 +123,9 @@ function insertIntoChat(sessionId, text) {
     return Promise.resolve(false);
   }
 }
+
+// src/render.js
+import { jsx as jsx7 } from "react/jsx-runtime";
 
 // src/widgets.js
 import { jsx as jsx5 } from "react/jsx-runtime";
@@ -187,7 +195,6 @@ function RecipeWidget({ attrs }) {
 // src/data-widgets.js
 import { jsx as jsx3, jsxs as jsxs3 } from "react/jsx-runtime";
 import { useState as useState2 } from "react";
-import { host as host2 } from "@hermes/plugin-sdk";
 
 // src/arithmetic.js
 function validNumeric2(s) {
@@ -218,14 +225,14 @@ function safeFormula(expr, vars = {}) {
     if (++ops > 120 || !Number.isFinite(v) || Math.abs(v) > 1e12) throw Error("Calculation is out of range");
     return v;
   };
-  function atom2() {
+  function atom3() {
     if (++level > 16) throw Error("Expression is too deeply nested");
     let v, t = take();
     if (t === "(") {
       v = add();
       if (take() !== ")") throw Error("Unclosed parentheses");
     } else if (t === "-" || t === "+") {
-      v = (t === "-" ? -1 : 1) * atom2();
+      v = (t === "-" ? -1 : 1) * atom3();
     } else if (t && /^[A-Za-z_]/.test(t)) {
       if (!Object.prototype.hasOwnProperty.call(vars, t) || !Number.isFinite(vars[t])) throw Error(`Unknown input: ${t}`);
       v = vars[t];
@@ -237,7 +244,7 @@ function safeFormula(expr, vars = {}) {
     return guard(v);
   }
   function power() {
-    let v = atom2();
+    let v = atom3();
     if (peek() === "^") {
       take();
       const e = power();
@@ -413,12 +420,7 @@ function MatrixWidget({ attrs, sessionId }) {
   const rankings = options.map((option, i) => ({ option, score: total > 0 ? rows[i].reduce((s, x, j) => s + x * weights[j], 0) / total : null })).sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
   const copy = async () => {
     const text = `Compare my selection: ${rankings.map((r) => `${r.option} ${r.score === null ? "unrated" : r.score.toFixed(2) + "/10"}`).join(", ")}. Criteria weights: ${criteria.map((c, i) => `${c}=${weights[i]}`).join(", ")}.`;
-    try {
-      const ok = await host2.composer.insertText(sessionId ?? null, text, { mode: "block" });
-      if (!ok) host2.notify({ kind: "warning", message: "Open this chat to insert the ranking." });
-    } catch {
-      host2.notify({ kind: "error", message: "Cannot insert the comparison." });
-    }
+    await insertIntoChat(sessionId, text);
   };
   return shell(attrs, jsxs3("div", { children: [
     jsx3("div", { style: { ...sub, marginBottom: 11 }, children: "Adjust criterion weights (0\u20135). Scores are supplied by the answer, not recalculated." }),
@@ -526,7 +528,6 @@ function SparklineWidget({ attrs }) {
 // src/content-widgets.js
 import { jsx as jsx4, jsxs as jsxs4 } from "react/jsx-runtime";
 import { useState as useState3 } from "react";
-import { host as host3 } from "@hermes/plugin-sdk";
 function TableWidget({ attrs }) {
   const cols = parts(attrs.columns || attrs.headers, "|", 7, 80);
   const rows = clean(attrs.rows, 1e4).split(";").slice(0, 80).map((row) => row.split("|").slice(0, cols.length || 5).map((x) => clean(x, 180)));
@@ -573,15 +574,15 @@ function CardsWidget({ attrs }) {
 }
 function ChecklistWidget({ attrs, sessionId }) {
   const items = parts(attrs.items, "|", 20, 190);
-  const key = "checks:" + hash((sessionId || "new") + "|" + JSON.stringify(attrs));
+  const key = sessionId === GALLERY_SESSION ? null : "checks:" + hash((sessionId || "new") + "|" + JSON.stringify(attrs));
   const [checked, setChecked] = useState3(() => {
-    const saved = pluginContext?.storage?.get(key, []);
+    const saved = key ? pluginContext?.storage?.get(key, []) : [];
     return Array.isArray(saved) ? saved.filter((n) => Number.isInteger(n) && n >= 0 && n < items.length) : [];
   });
   const toggle = (i) => {
     const next = checked.includes(i) ? checked.filter((x) => x !== i) : [...checked, i];
     setChecked(next);
-    pluginContext?.storage?.set(key, next);
+    if (key) pluginContext?.storage?.set(key, next);
   };
   return shell(attrs, jsxs4("div", { children: [
     jsx4("div", { style: { ...sub, marginBottom: 10 }, children: `${checked.length} of ${items.length} complete` }),
@@ -606,12 +607,7 @@ function OptionsWidget({ attrs, sessionId }) {
   const insert = async (choice) => {
     setSelected(choice);
     const text = clean(attrs.prompt, 200).replaceAll("[choice]", choice).replaceAll("{choice}", choice) || `I choose: ${choice}`;
-    try {
-      const ok = await host3.composer.insertText(sessionId ?? null, text, { mode: "block" });
-      if (!ok) host3.notify({ kind: "warning", message: "Open this chat to add your selection." });
-    } catch {
-      host3.notify({ kind: "error", message: "Cannot insert into the composer." });
-    }
+    await insertIntoChat(sessionId, text);
   };
   return shell(attrs, jsxs4("div", { children: [
     attrs.detail && jsx4("div", { style: { ...sub, marginBottom: 12 }, children: clean(attrs.detail, 300) }),
@@ -1195,6 +1191,21 @@ function LayoutWidget({ attrs, sessionId }) {
   ] }), "Composed layout");
 }
 
+// src/render.js
+function renderDirective({ attrs = {}, sessionId }) {
+  if (Object.keys(attrs).length > 26) return empty("Invalid Intelligent UI component.");
+  const kind = clean(attrs.kind, 20).toLowerCase();
+  const Widget = kind === "layout" ? LayoutWidget : getWidget(kind);
+  if (!Widget) return empty("Unsupported Intelligent UI component: " + kind);
+  const key = kind === "layout" ? hash(attrs.tree || "") : kind === "recipe" ? hash(JSON.stringify(attrs)) : void 0;
+  return jsx7(Widget, { attrs, sessionId }, key);
+}
+
+// src/gallery.js
+import { useState as useState5 } from "react";
+import { jsx as jsx8, jsxs as jsxs6 } from "react/jsx-runtime";
+import { atom, useValue } from "@hermes/plugin-sdk";
+
 // src/catalog.js
 var NATIVE_MARKER = "[HERMES NATIVE UI]";
 var RECIPE_EXAMPLE = '::intui{kind="recipe" title="Vanilla cake" servings="8" ingredients="240|g|flour;150|g|sugar;115|g|butter;2||eggs;120|ml|milk;2|tsp|baking powder;1|tsp|vanilla" steps="Heat oven to 175 \xB0C and grease the pan.|Cream butter and sugar. Beat in eggs and vanilla.|Fold in flour and baking powder, alternating with milk.|Bake until a skewer comes out clean, about 30 minutes.|Cool before slicing."}';
@@ -1245,8 +1256,9 @@ var LAYOUT_EXAMPLES = [
   '::intui{kind="layout" title="Interactive quote" sample="true" tree="col[row[slider(name=qty;label=Parts;value=3;min=1;max=30)~segmentedcontrol(name=rate;label=Material;values=12|20;labels=PLA|PETG;value=12)]~derive(name=total;expression=qty*rate)~when(test=qty>=5)[badge(text=Bulk order)]~tabview[tab(label=Quote)[result(label=Total;expression=total;unit=NOK)]~tab(label=Breakdown)[bars(labels=Rate|Total;values==rate|=total)]]]"}',
   '::intui{kind="layout" title="Project form" tree="col[form[textinput(name=project;label=Project;required=true;minlen=3)~datepicker(name=due;label=Deadline;required=true)~textarea(name=notes;label=Notes)~toggle(name=approved;label=Approved;required=true;value=0)~submit(text=Prepare draft;prompt=Plan $project for $due)]]"}'
 ];
+var NATIVE_EXAMPLES = [...NATIVE_GROUPS.flatMap((group) => group.examples), ...LAYOUT_EXAMPLES, RECIPE_EXAMPLE];
 function nativeInstructions(text, selected) {
-  const policy = selected === "visual" ? "Mode: Visual. Prefer a working visual or interactive widget whenever it adds value." : "Mode: Auto. Use prose for ordinary questions; use a widget when requested or when it improves the answer.";
+  const policy = selected === "visual" ? "Mode: Visual. When the user asks to show, make, or continue a visual, render the widget in this reply." : "Mode: Auto. Use prose for ordinary questions; use a widget when requested or when it improves the answer.";
   const matched = NATIVE_GROUPS.filter((group) => group.match.test(text));
   const recipe = /\b(?:recip(?:e|ie)s?|cake|baking)\b/i.test(text);
   const layout = /\b(?:forms?|layout|dashboard|shared state|reactive|linked|persist\w*|sav(?:e|ed) (?:form|inputs)|tabview|date (?:field|picker))\b/i.test(text);
@@ -1263,6 +1275,7 @@ function nativeInstructions(text, selected) {
   const examples = matched.length ? matched.flatMap((group) => group.examples) : useLayout ? [] : NATIVE_GROUPS.map((group) => group.examples[0]);
   return [
     policy,
+    "For native widgets (including follow-ups such as \u201Cdo them\u201D), use the inline ::intui format below. Do not call terminal, file-writing, code execution, or preview tools for the widget unless the user explicitly asks for a file or custom web page.",
     'Render up to three standalone ::intui directives in this reply, separated by blank lines. Double-quote attributes, with no quotes, newlines or braces inside values. Never wrap directives in code fences. Do not emit OpenUI Lang, HTML or JS. Keep each line under 1600 characters. Use prose if a visual is inappropriate. Do not invent facts; label illustrations sample="true".',
     "Use the following shapes as references, and replace all sample content with the answer:",
     ...examples,
@@ -1276,22 +1289,65 @@ function nativeInstructions(text, selected) {
   ].join("\n");
 }
 
+// src/gallery.js
+var galleryOpen = atom(false);
+var cards = NATIVE_EXAMPLES.map((line, index) => ({
+  id: String(index),
+  attrs: Object.fromEntries([...line.matchAll(/([a-z]+)="([^"]*)"/g)].map(([, name, value]) => [name, value]))
+}));
+var initialCard = cards.find((card) => card.attrs.title === "Interactive quote") ?? cards[0];
+function isGalleryRequest(text) {
+  const phrase = text.trim();
+  if (/^\/intui-examples$/i.test(phrase)) return true;
+  if (phrase.length > 180 || /\n|::|[0-9]|\b(?:using|based on|from|with my|for my|files?|attachments?|html)\b/i.test(phrase)) return false;
+  const clean2 = phrase.replace(/[.!?]+$/, "");
+  return /^(?:please\s+)?(?:show(?: me)?|open|try|generate|give me|make|create)\s+(?:(?:some|som|a few|a|the)\s+)?(?:examples?\s+(?:of|for)\s+(?:the\s+)?(?:visual\s+)?(?:intelligent ui|native widgets|openui)|(?:(?:visual\s+)?(?:intelligent ui|native widget|openui)\s+examples?|widget examples))(?:\s+(?:here|for me|to test|for me to test|here for me|here to test|here for me to test))?$/i.test(clean2);
+}
+function GalleryButton() {
+  const open = useValue(galleryOpen);
+  return jsx8("button", {
+    type: "button",
+    style: { ...btn, whiteSpace: "nowrap", fontSize: 11 },
+    "aria-expanded": open,
+    onClick: () => galleryOpen.set(!open),
+    children: "Widget examples"
+  });
+}
+function GalleryPanel() {
+  const open = useValue(galleryOpen);
+  const [selection, setSelection] = useState5(initialCard.id);
+  if (!open) return null;
+  const selected = cards.find((card) => card.id === selection) ?? initialCard;
+  return jsxs6("section", {
+    "aria-label": "Native widget examples",
+    style: { padding: "10px 12px", maxHeight: "min(46vh, 420px)", overflowY: "auto" },
+    children: [
+      jsxs6("div", { style: { ...rowCss, justifyContent: "space-between" }, children: [
+        jsx8("strong", { children: "Native widget examples" }),
+        jsx8("select", {
+          "aria-label": "Widget example",
+          style: btn,
+          value: selected.id,
+          onChange: (event) => setSelection(event.target.value),
+          children: cards.map((card) => jsx8("option", { value: card.id, children: `${card.attrs.title} \xB7 ${card.attrs.kind}` }, card.id))
+        }),
+        jsx8("button", { type: "button", style: btn, onClick: () => galleryOpen.set(false), children: "Close examples" })
+      ] }),
+      jsx8("p", { style: sub, children: "Built-in samples. No model request or files. Draft actions only preview a notification here." }),
+      jsx8("div", { children: renderDirective({ attrs: selected.attrs, sessionId: GALLERY_SESSION }) }, selected.id)
+    ]
+  });
+}
+
 // src/entry.js
 var ID = "hermes-intelligent-ui";
-var { host: host4, COMPOSER_AREAS, TRANSCRIPT_DIRECTIVE_AREA, atom, useValue } = sdk;
-var mode = atom("off");
-function renderDirective({ attrs = {}, sessionId }) {
-  if (Object.keys(attrs).length > 26) return empty("Invalid Intelligent UI component.");
-  const kind = clean(attrs.kind, 20).toLowerCase();
-  const Widget = kind === "layout" ? LayoutWidget : getWidget(kind);
-  if (!Widget) return empty("Unsupported Intelligent UI component: " + kind);
-  return jsx7(Widget, { attrs, sessionId }, kind === "layout" ? hash(attrs.tree || "") : kind === "recipe" ? hash(JSON.stringify(attrs)) : void 0);
-}
+var { host: host2, COMPOSER_AREAS, TRANSCRIPT_DIRECTIVE_AREA, atom: atom2, useValue: useValue2 } = sdk;
+var mode = atom2("off");
 function Toggle() {
-  const selected = useValue(mode);
+  const selected = useValue2(mode);
   const next = { off: "auto", auto: "visual", visual: "off" }[selected] || "off";
   const label = { off: "Intelligent UI \xB7 Off", auto: "Intelligent UI \xB7 Auto", visual: "Intelligent UI \xB7 Visual" }[selected];
-  return jsx7("button", {
+  return jsx9("button", {
     type: "button",
     title: `UI mode: ${selected}. Click to switch to ${next}.`,
     "aria-pressed": selected !== "off",
@@ -1310,10 +1366,10 @@ function Toggle() {
     onClick: () => {
       mode.set(next);
       pluginContext?.storage?.set("mode", next);
-      host4.notify({ kind: "info", message: next === "off" ? "Intelligent UI disabled." : `Intelligent UI: ${next} mode for new requests.` });
+      host2.notify({ kind: "info", message: next === "off" ? "Intelligent UI disabled." : `Intelligent UI: ${next} mode for new requests.` });
     },
-    children: jsxs6("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 }, children: [
-      jsx7("span", { style: { fontSize: 12 }, children: "\u25C8" }),
+    children: jsxs7("span", { style: { display: "inline-flex", alignItems: "center", gap: 5 }, children: [
+      jsx9("span", { style: { fontSize: 12 }, children: "\u25C8" }),
       label
     ] })
   });
@@ -1328,14 +1384,24 @@ var entry_default = {
     const storedMode = ctx.storage.get("mode", null);
     mode.set(["off", "auto", "visual"].includes(storedMode) ? storedMode : ctx.storage.get("enabled", false) === true ? "auto" : "off");
     if (typeof COMPOSER_AREAS?.actions === "string") {
-      ctx.register({ id: "composer-mode-button", area: COMPOSER_AREAS.actions, order: 85, render: () => jsx7(Toggle, {}) });
+      ctx.register({ id: "composer-mode-button", area: COMPOSER_AREAS.actions, order: 85, render: () => jsx9(Toggle, {}) });
     } else if (typeof COMPOSER_AREAS?.bottom === "string") {
-      ctx.register({ id: "composer-mode-button", area: COMPOSER_AREAS.bottom, order: 85, render: () => jsx7(Toggle, {}) });
+      ctx.register({ id: "composer-mode-button", area: COMPOSER_AREAS.bottom, order: 85, render: () => jsx9(Toggle, {}) });
+    }
+    const hasGallery = typeof COMPOSER_AREAS?.top === "string" && typeof COMPOSER_AREAS?.actions === "string";
+    if (hasGallery) {
+      ctx.register({ id: "widget-examples-button", area: COMPOSER_AREAS.actions, order: 86, render: () => jsx9(GalleryButton, {}) });
+      ctx.register({ id: "widget-examples-panel", area: COMPOSER_AREAS.top, order: 10, render: () => jsx9(GalleryPanel, {}) });
     }
     if (typeof COMPOSER_AREAS?.middleware === "string") {
       ctx.register({ id: "composer-ui-instructions", area: COMPOSER_AREAS.middleware, data: {
         handler(draft) {
-          if (mode.get() === "off" || !draft || typeof draft.text !== "string") return draft;
+          if (!draft || typeof draft.text !== "string") return draft;
+          if (hasGallery && !draft.attachments?.length && isGalleryRequest(draft.text)) {
+            galleryOpen.set(true);
+            return null;
+          }
+          if (mode.get() === "off") return draft;
           if (!draft.text.trim() || /^\s*\//.test(draft.text) || draft.text.includes(NATIVE_MARKER)) return draft;
           return { ...draft, text: draft.text + "\n\n--- Attached Context ---\n\n" + NATIVE_MARKER + "\n" + nativeInstructions(draft.text, mode.get()) };
         }
@@ -1344,11 +1410,12 @@ var entry_default = {
     if (typeof TRANSCRIPT_DIRECTIVE_AREA === "string") {
       ctx.register({ id: "inline-ui-renderer", area: TRANSCRIPT_DIRECTIVE_AREA, data: { name: "intui", render: renderDirective } });
     } else {
-      host4.notify({ kind: "warning", message: "This Hermes Desktop build lacks inline transcript directives. Update Hermes to use Intelligent UI." });
+      host2.notify({ kind: "warning", message: "This Hermes Desktop build lacks inline transcript directives. Update Hermes to use Intelligent UI." });
     }
     ctx.onDispose(() => {
       setPluginContext(null);
       mode.set("off");
+      galleryOpen.set(false);
     });
   }
 };

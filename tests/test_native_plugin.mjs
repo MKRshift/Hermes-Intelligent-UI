@@ -6,6 +6,7 @@ const state = []
 let stateIndex = 0
 const modules = {}
 const registrations = new Map()
+const draftWrites = []
 const atom = initial => ({ value: initial, get() { return this.value }, set(value) { this.value = value } })
 const jsx = (type, props) => ({ type, props })
 const context = createContext({ Intl })
@@ -16,8 +17,9 @@ function shim(name, exports) {
 }
 shim('@hermes/plugin-sdk', {
   atom, useValue: value => value.get(),
-  COMPOSER_AREAS: { actions: 'composer.actions', middleware: 'composer.middleware' },
-  TRANSCRIPT_DIRECTIVE_AREA: 'transcript.directives', host: { notify() {} }
+  COMPOSER_AREAS: { actions: 'composer.actions', top: 'composer.top', middleware: 'composer.middleware' },
+  TRANSCRIPT_DIRECTIVE_AREA: 'transcript.directives',
+  host: { notify() {}, composer: { insertText: (...args) => { draftWrites.push(args); return true } } }
 })
 shim('react/jsx-runtime', { jsx, jsxs: jsx })
 shim('react', {
@@ -111,4 +113,23 @@ for (const item of catalog) {
 const formOnly = examplesIn(middleware({ text: 'Build a form with a date picker and save the inputs.' }).text)
 assert.ok(formOnly.some(item => item.kind === 'layout' && item.tree.includes('datepicker')))
 assert.ok(formOnly.every(item => item.kind === 'layout'))
-console.log(`Native composer, recipe interactions and ${Object.keys(expected).length} widget types passed.`)
+
+const panel = registrations.get('widget-examples-panel').render()
+const paintGallery = () => { stateIndex = 0; return panel.type(panel.props) }
+state.length = 0
+assert.equal(paintGallery(), null)
+assert.equal(middleware({ text: 'generate som example of visual intelligent ui here for me to test' }), null)
+assert.ok(middleware({ text: 'Generate examples of Intelligent UI from my dataset' }).text.includes('[HERMES NATIVE UI]'))
+assert.ok(middleware({ text: 'Show widget examples', attachments: ['file'] }).text.includes('[HERMES NATIVE UI]'))
+const picker = find(paintGallery(), node => node.type === 'select' && node.props['aria-label'] === 'Widget example')
+assert.equal(picker.props.children.length, 24) // 23 types plus a second layout sample
+const estimate = picker.props.children.find(option => option.props.children === 'Estimate · calc')
+picker.props.onChange({ target: { value: estimate.props.value } })
+const galleryCalc = find(paintGallery(), node => typeof node.type === 'function')
+const calculator = galleryCalc.type(galleryCalc.props)
+assert.equal(find(calculator, node => node.props.role === 'status').props.children, '375 NOK')
+find(calculator, node => node.props.children === 'Use result in chat').props.onClick()
+assert.equal(draftWrites.length, 0, 'Gallery actions must not insert into the composer')
+find(paintGallery(), node => node.props.children === 'Close examples').props.onClick()
+assert.equal(paintGallery(), null)
+console.log(`Native composer, local example gallery, recipe interactions and ${Object.keys(expected).length} widget types passed.`)

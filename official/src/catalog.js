@@ -50,9 +50,11 @@ const LAYOUT_EXAMPLES = [
   '::intui{kind="layout" title="Project form" tree="col[form[textinput(name=project;label=Project;required=true;minlen=3)~datepicker(name=due;label=Deadline;required=true)~textarea(name=notes;label=Notes)~toggle(name=approved;label=Approved;required=true;value=0)~submit(text=Prepare draft;prompt=Plan $project for $due)]]"}'
 ]
 
+const NATIVE_EXAMPLES = [...NATIVE_GROUPS.flatMap(group => group.examples), ...LAYOUT_EXAMPLES, RECIPE_EXAMPLE]
+
 function nativeInstructions(text, selected) {
   const policy = selected === 'visual'
-    ? 'Mode: Visual. Prefer a working visual or interactive widget whenever it adds value.'
+    ? 'Mode: Visual. When the user asks to show, make, or continue a visual, render the widget in this reply.'
     : 'Mode: Auto. Use prose for ordinary questions; use a widget when requested or when it improves the answer.'
   const matched = NATIVE_GROUPS.filter(group => group.match.test(text))
   const recipe = /\b(?:recip(?:e|ie)s?|cake|baking)\b/i.test(text)
@@ -69,6 +71,7 @@ function nativeInstructions(text, selected) {
   const examples = matched.length ? matched.flatMap(group => group.examples)
     : useLayout ? [] : NATIVE_GROUPS.map(group => group.examples[0])
   return [policy,
+    'For native widgets (including follow-ups such as “do them”), use the inline ::intui format below. Do not call terminal, file-writing, code execution, or preview tools for the widget unless the user explicitly asks for a file or custom web page.',
     'Render up to three standalone ::intui directives in this reply, separated by blank lines. Double-quote attributes, with no quotes, newlines or braces inside values. Never wrap directives in code fences. Do not emit OpenUI Lang, HTML or JS. Keep each line under 1600 characters. Use prose if a visual is inappropriate. Do not invent facts; label illustrations sample="true".',
     'Use the following shapes as references, and replace all sample content with the answer:',
     ...examples,
@@ -82,4 +85,4 @@ function nativeInstructions(text, selected) {
   ].join('\n')
 }
 
-export { NATIVE_MARKER, nativeInstructions }
+export { NATIVE_MARKER, NATIVE_EXAMPLES, nativeInstructions }

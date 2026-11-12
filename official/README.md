@@ -17,6 +17,10 @@ The [static OpenUI converter](OPENUI_COMPAT.md) is also available. It translates
 
 ## Try it
 
+Click **Widget examples** beside the composer, or type `/intui-examples`. The panel uses built-in data and renders the same components as chat replies. It needs no model, leaves the chat unchanged, and is available in every mode. A plain request such as “show me examples of Intelligent UI” also opens it locally. Example draft buttons show a notification instead of changing the composer.
+
+For model-generated widgets in **Auto** or **Visual**, try:
+
 - **Chart:** “Plot weekly totals 8, 12, and 10 in a native line chart.”
 - **Comparison:** “Build an adjustable comparison matrix for two options. A has cost score 8 and quality score 6; B has cost score 6 and quality score 9. Start with weights 2 and 3.”
 - **Reactive layout:** “Make a native quote with quantity and material controls, a live total, and a breakdown tab. Use 12 NOK per PLA part and 20 NOK per PETG part.”
@@ -31,6 +35,7 @@ Develop with Node 22+. Edit the modules under `src/` (composer catalog, widget f
 npm --prefix official ci
 npm --prefix official run build
 npm --prefix official test
+./Install_Native_Hermes_UI.command
 ```
 
 To verify all catalog examples against Hermes's parser, run `node --experimental-vm-modules tests/test_native_plugin.mjs /path/to/transcript-directives.ts` using the parser under `apps/desktop/src/lib/` in the Hermes checkout.
@@ -38,3 +43,5 @@ To verify all catalog examples against Hermes's parser, run `node --experimental
 Verified on 12 November 2026 in the installed Hermes Desktop v0.23.1 with its existing local Hermes Brain model. In a new chat, the prompt `create a cake recipie` in Visual mode produced a **Simple Vanilla Cake** card. Increasing servings from 8 to 9 changed flour from 250 g to 281.25 g. The local regression check also verifies checking and resetting items.
 
 The expanded catalog passed parser and rendering checks for all 23 kinds, plus the recovered v0.6.0 tests for linked state, forms, saved inputs, and the converter. An existing recipe still rendered in Hermes after installing the modular build. Fresh line-chart and mixed-widget prompts were attempted in the installed app, but the local Ollama runner logged a GPU error and returned empty streams; live generation of those prompts was not verified.
+
+The examples panel was verified in the installed app. The interactive quote changed from 36 NOK to 48 NOK when the parts slider moved from 3 to 4. The gallery also covers the cases where a model writes files or emits malformed directives instead of showing an example. The panel and generated replies are separate paths; the model still controls what goes into its replies.

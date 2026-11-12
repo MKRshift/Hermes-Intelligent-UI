@@ -1,7 +1,6 @@
 import { jsx, jsxs } from 'react/jsx-runtime'
 import { useState } from 'react'
-import { host } from '@hermes/plugin-sdk'
-import { pluginContext, clean, parts, number, fnum, hash, COLOR, MUTED, ACCENT, BORDER, sub, btn, rowCss, shell, empty, pill } from './shared.js'
+import { GALLERY_SESSION, insertIntoChat, pluginContext, clean, parts, number, fnum, hash, COLOR, MUTED, ACCENT, BORDER, sub, btn, rowCss, shell, empty, pill } from './shared.js'
 
 function TableWidget({attrs}) {
   const cols = parts(attrs.columns || attrs.headers,'|',7,80)
@@ -49,15 +48,15 @@ function CardsWidget({attrs}) {
 }
 function ChecklistWidget({attrs,sessionId}) {
   const items = parts(attrs.items,'|',20,190)
-  const key='checks:'+hash((sessionId||'new')+'|'+JSON.stringify(attrs))
+  const key=sessionId===GALLERY_SESSION?null:'checks:'+hash((sessionId||'new')+'|'+JSON.stringify(attrs))
   const [checked,setChecked] = useState(()=> {
-    const saved = pluginContext?.storage?.get(key,[])
+    const saved = key ? pluginContext?.storage?.get(key,[]) : []
     return Array.isArray(saved)?saved.filter(n=>Number.isInteger(n)&&n>=0&&n<items.length):[]
   })
   const toggle=i=>{
     const next=checked.includes(i)?checked.filter(x=>x!==i):[...checked,i]
     setChecked(next)
-    pluginContext?.storage?.set(key,next)
+    if (key) pluginContext?.storage?.set(key,next)
   }
   return shell(attrs, jsxs('div',{children:[
     jsx('div',{style:{...sub,marginBottom:10},children:`${checked.length} of ${items.length} complete`}),
@@ -82,10 +81,7 @@ function OptionsWidget({attrs,sessionId}) {
   const insert = async choice => {
     setSelected(choice)
     const text = clean(attrs.prompt,200).replaceAll('[choice]',choice).replaceAll('{choice}',choice) || `I choose: ${choice}`
-    try {
-      const ok = await host.composer.insertText(sessionId??null,text,{mode:'block'})
-      if (!ok) host.notify({kind:'warning',message:'Open this chat to add your selection.'})
-    } catch { host.notify({kind:'error',message:'Cannot insert into the composer.'}) }
+    await insertIntoChat(sessionId,text)
   }
   return shell(attrs, jsxs('div',{children:[
     attrs.detail&&jsx('div',{style:{...sub,marginBottom:12},children:clean(attrs.detail,300)}),
