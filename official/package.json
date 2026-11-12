@@ -1,0 +1,12 @@
+{
+  "name": "hermes-intelligent-ui-native",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild src/entry.js --bundle --format=esm --target=es2022 --external:@hermes/plugin-sdk --external:react --external:react/jsx-runtime --banner:js='// Generated from official/src. Run npm run build in official/.' --outfile=plugin.js",
+    "test": "for suite in ../tests/test_native_plugin.mjs ../tests/test-native-*.mjs; do node --experimental-vm-modules \"$suite\" || exit; done"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

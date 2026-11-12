@@ -1,0 +1,5 @@
+// OpenUI Lang 1.0 static subset; can be converted without executing model code.
+root = Col([header, Grid([stats, details], 2)], 3)
+header = Col([Title("Workshop dashboard", "lg"), Caption("Illustrative data • no API calls")])
+stats = Card([Title("Daily orders", "md"), Chart("bar", [{label:"Mon",value:12},{label:"Tue",value:23},{label:"Wed",value:18}], "label", ["value"])])
+details = Card([Text("Three-day summary"), Table(["Day", "Orders"], [["Monday",12],["Tuesday",23],["Wednesday",18]]), Link("Project reference", "https://example.org")])

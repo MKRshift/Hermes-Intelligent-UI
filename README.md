@@ -6,7 +6,7 @@ Interactive answers inside the Hermes Desktop app you already use. The native pl
 
 1. Run [Install_Native_Hermes_UI.command](Install_Native_Hermes_UI.command). The installer saves a copy of the previous plugin.
 2. In Hermes, open the Command Palette and choose **Reload desktop plugins** if the composer still shows **OpenUI** instead of **Intelligent UI**.
-3. Select **Auto** or **Visual** beside the composer. Try **create a cake recipe**. The inline card lets you change servings and check off ingredients and steps.
+3. Select **Auto** or **Visual** beside the composer. Try a chart, a calculator, a form, or one of the [example prompts](official/README.md#try-it). The native plugin supports 23 widget kinds, including reactive layouts.
 
 This route uses Hermes’s native `::intui` widgets. A reply already saved as raw OpenUI Lang source will stay as written; send a fresh prompt with the native plugin active. No separate app or source build is needed.
 
