@@ -16,14 +16,14 @@ index 45efaadd983acd51471bfc644e4159aa4e59fe83..e3fd07e9307fbe9c47131eb0dcfc5c16
    "devDependencies": {
      "@babel/core": "8.0.7",
 diff --git a/apps/desktop/src/components/assistant-ui/markdown-text.tsx b/apps/desktop/src/components/assistant-ui/markdown-text.tsx
-index 1d1457a64774946f94ea9b089fdd7f0a78b9032d..ab3975806458b0bdf12a9a98ef2ee047d76292dd 100644
+index 1d1457a64774946f94ea9b089fdd7f0a78b9032d..f3f3981963765375d15c52b5f42c8e5bf6e54c93 100644
 --- a/apps/desktop/src/components/assistant-ui/markdown-text.tsx
 +++ b/apps/desktop/src/components/assistant-ui/markdown-text.tsx
 @@ -56,6 +56,7 @@ import { remarkTranscriptDirectives } from '@/lib/transcript-directives'
  import { cn } from '@/lib/utils'
  import { useForcedTextDirection } from '@/store/text-direction'
  
-+import { HermesOpenUI } from './openui-bridge'
++import { HermesOpenUI, OpenUITranscriptBlock } from './openui-bridge'
  import { ArtifactCard } from './artifact-card'
  import { SessionRefLink } from './directive-text'
  import { detectEmbed, extractAlert, MarkdownAlert, RichCodeBlock, UrlEmbed } from './embeds'
@@ -51,7 +51,7 @@ index 1d1457a64774946f94ea9b089fdd7f0a78b9032d..ab3975806458b0bdf12a9a98ef2ee047
 +          // @openuidev/react-lang runtime and original Thesys component library.
 +          // Foreign chat previews and scratchpads NEVER execute these widgets.
 +          if (renderOpenUI && !disableArtifacts && !previewOnly && !scratchpad && /^(openui|openui-lang|oui)$/i.test(props.language || '')) {
-+            return <HermesOpenUI response={props.code} isStreaming={isStreaming} />
++            return <HermesOpenUI response={props.code} isStreaming={isStreaming} offset={props.node?.position?.start.offset ?? 0} />
 +          }
 +
            const artifact =
@@ -66,7 +66,15 @@ index 1d1457a64774946f94ea9b089fdd7f0a78b9032d..ab3975806458b0bdf12a9a98ef2ee047
    )
  
    if (text.length > MAX_MARKDOWN_CHARS) {
-@@ -916,7 +926,7 @@ export function MarkdownTextContent({ isRunning, text, ...surfaceProps }: Markdo
+@@ -855,6 +865,7 @@ function MarkdownTextSurface({
+         // parseIncompleteMarkdown stays false to avoid a second full-text
+         // remend pass.
+         parseIncompleteMarkdown={false}
++        BlockComponent={renderOpenUI ? OpenUITranscriptBlock : undefined}
+         parseMarkdownIntoBlocksFn={parseMarkdownIntoBlocksCached}
+         plugins={plugins}
+         preprocess={preprocessWithTailRepair}
+@@ -916,7 +927,7 @@ export function MarkdownTextContent({ isRunning, text, ...surfaceProps }: Markdo
  const MarkdownTextImpl = () => {
    const textDirection = useForcedTextDirection()
  

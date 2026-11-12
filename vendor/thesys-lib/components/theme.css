@@ -2,8 +2,7 @@
    borders) follow the OpenUI theme tokens, so components match the Agent
    Interface in light and dark; the dark block only retunes status, chart and
    map colors. */
-:root,
-[data-theme="light"] {
+.hermes-openui-original {
   color-scheme: light;
   --iui-font: var(--openui-font-body, "Inter", sans-serif);
   --iui-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -84,8 +83,7 @@
   --iui-photo-empty-icon: var(--iui-border-strong);
 }
 
-:root[data-openui-theme="dark"],
-[data-theme="dark"] {
+.hermes-openui-original[data-openui-theme="dark"] {
   color-scheme: dark;
   --iui-shadow: 0 4px 20px rgb(0 0 0 / 35%);
   --iui-shadow-sm: 0 1px 3px rgb(0 0 0 / 30%);

@@ -1,16 +1,21 @@
 import './openui-styles.css'
 
+import { useAui, useAuiState } from '@assistant-ui/react'
 import { Renderer, type ActionEvent } from '@openuidev/react-lang'
 import { host } from '@hermes/plugin-sdk'
 import { useStore } from '@nanostores/react'
-import { useCallback, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { Block, type BlockProps } from 'streamdown'
 import { useSessionView } from '@/app/chat/session-view'
+import { ErrorBoundary } from '@/components/error-boundary'
+import { useTheme } from '@/themes'
+import { checkpointWidgetState, readWidgetState, rememberWidgetState, sourceRevision, widgetKey } from './openui-state'
 import { runLibraryAction } from './thesys-lib/actions'
 import { demoTools } from './thesys-lib/demo-data'
 import { library } from './thesys-lib/library'
 
 const MAX_CODE_CHARS = 150_000
-const MAX_STATE_CHARS = 48_000
+const BlockIndex = createContext<number | null>(null)
 // The upstream demo's queries are read-only demo queries. Never register
 // model-defined mutations or arbitrary filesystem/network tools here.
 const readOnlyTools = Object.fromEntries(Object.entries(demoTools).filter(([name]) =>
@@ -27,35 +32,69 @@ function safeURL(raw: unknown): string | null {
 function safeText(value: unknown, limit=6000): string {
   return String(value ?? '').replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, limit)
 }
-function keyFor(session: string | null, source: string) {
-  let h = 2166136261
-  for (const c of source) h = Math.imul(h ^ c.charCodeAt(0), 16777619)
-  return `hermes-openui-v070:${session || 'local'}:${(h>>>0).toString(36)}`
+export function OpenUITranscriptBlock(props: BlockProps) {
+  return <BlockIndex.Provider value={props.index}><Block {...props} /></BlockIndex.Provider>
 }
-function initialStateFor(key: string): Record<string, unknown> {
-  try {
-    const raw = localStorage.getItem(key)
-    const parsed: unknown = raw ? JSON.parse(raw) : null
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
-  } catch { return {} }
+
+interface HermesOpenUIProps {
+  response: string
+  isStreaming: boolean
+  offset: number
 }
-/** The original Thesys OpenUI library, parsed/rendered by the REAL OpenUI runtime.
- * An inline assistant message, NOT an iframe or another chat window. */
-export function HermesOpenUI({ response, isStreaming }: { response: string; isStreaming: boolean }) {
+
+export function HermesOpenUI({ response, isStreaming, offset }: HermesOpenUIProps) {
   const view = useSessionView()
   const storedId = useStore(view.$storedId)
   const runtimeId = useStore(view.$runtimeId)
-  const sessionId = storedId || runtimeId || null
-  const key = keyFor(sessionId, response)
-  const [state, setState] = useState<Record<string, unknown>>(() => initialStateFor(key))
-  const [dark, setDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false)
+  const sessionId = storedId || runtimeId
+  const liveSession = runtimeId || storedId
+  const blockIndex = useContext(BlockIndex)
+  const aui = useAui()
+  const partIndex = aui.part.query?.type === 'index' ? aui.part.query.index : null
+  const messageId = useAuiState(s => s.message.id)
+  const rowId = useAuiState(s => {
+    const part = s.part as { sourceRowId?: number }
+    if (part.sourceRowId !== undefined) return part.sourceRowId
+    if (s.message.content.filter(candidate => candidate.type === 'text').length === 1) {
+      const row = s.message.metadata.custom.rowId
+      if (typeof row === 'number') return row
+    }
+  })
+  // Several backend rows can be folded into one assistant message. Persist by
+  // row and the text part's ordinal within that row, not the folded index.
+  const rowPart = useAuiState(s => partIndex === null ? 0 : s.message.content
+    .slice(0, partIndex)
+    .filter(part => part.type === 'text' && (part as { sourceRowId?: number }).sourceRowId === rowId).length)
+  const hasSlot = partIndex !== null && blockIndex !== null
+  const liveKey = hasSlot && liveSession ? widgetKey('live', liveSession, messageId, partIndex, blockIndex, offset) : null
+  const savedKey = hasSlot && sessionId && rowId !== undefined && !isStreaming
+    ? widgetKey('saved', sessionId, rowId, rowPart, blockIndex, offset, sourceRevision(response))
+    : null
+
+  return <OpenUIWidget key={liveKey} {...{ response, isStreaming, sessionId, liveKey, savedKey }} />
+}
+
+interface OpenUIWidgetProps {
+  response: string
+  isStreaming: boolean
+  sessionId: string | null
+  liveKey: string | null
+  savedKey: string | null
+}
+
+function OpenUISourceFallback({ response }: { response: string }) {
+  return <details><summary>Could not display this interactive answer. Show source</summary><pre>{response}</pre></details>
+}
+
+function OpenUIWidget({ response, isStreaming, sessionId, liveKey, savedKey }: OpenUIWidgetProps) {
+  // Treat initialState as a mount-time seed. Feeding a fresh seed on every
+  // chunk would overwrite changes in OpenUI's active store.
+  const [initialState] = useState(() => readWidgetState(liveKey, savedKey))
+  const [hasRoot, setHasRoot] = useState<boolean | null>(null)
+  const { renderedMode } = useTheme()
   useEffect(() => {
-    const media = window.matchMedia?.('(prefers-color-scheme: dark)')
-    if (!media) return
-    const update=() => setDark(media.matches)
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
+    if (liveKey && savedKey) checkpointWidgetState(liveKey, savedKey)
+  }, [liveKey, savedKey])
   const handleAction = useCallback((event: ActionEvent) => {
     if (event.type === 'continue_conversation') {
       const lines = [safeText(event.humanFriendlyMessage || 'Continue from this interface')]
@@ -73,25 +112,27 @@ export function HermesOpenUI({ response, isStreaming }: { response: string; isSt
     }
   }, [sessionId])
   const handleState = useCallback((value: Record<string, unknown>) => {
-    try {
-      const serialized = JSON.stringify(value)
-      if (serialized.length <= MAX_STATE_CHARS) localStorage.setItem(key, serialized)
-    } catch { /* Disable persistence if browser storage is unavailable. */ }
-  }, [key])
-  useEffect(() => { setState(initialStateFor(key)) }, [key])
+    if (!liveKey) return
+    rememberWidgetState(liveKey, value)
+    if (savedKey) checkpointWidgetState(liveKey, savedKey)
+  }, [liveKey, savedKey])
   if (response.length > MAX_CODE_CHARS) return <div>OpenUI payload is too large to render safely.</div>
   return (
-    <section className="hermes-openui-original" data-openui-theme={dark ? 'dark' : 'light'}
+    <section className="hermes-openui-original" data-openui-theme={renderedMode}
       style={{width:'100%',maxWidth:'100%',minWidth:0,overflow:'hidden',margin:'12px 0'}}>
-      <Renderer
-        response={response}
-        isStreaming={isStreaming}
-        library={library}
-        toolProvider={readOnlyTools}
-        onAction={handleAction}
-        initialState={state}
-        onStateUpdate={handleState}
-      />
+      <ErrorBoundary label="openui-widget" fallback={() => <OpenUISourceFallback response={response} />}>
+        <Renderer
+          response={response}
+          isStreaming={isStreaming}
+          library={library}
+          toolProvider={readOnlyTools}
+          onAction={handleAction}
+          initialState={initialState}
+          onStateUpdate={handleState}
+          onParseResult={result => setHasRoot(Boolean(result?.root || result?.rootExpression))}
+        />
+        {!isStreaming && hasRoot === false && <OpenUISourceFallback response={response} />}
+      </ErrorBoundary>
     </section>
   )
 }

@@ -27,6 +27,7 @@ def digest(path):
 def payload():
     yield ROOT / "bridge/openui-bridge.tsx", TRANSCRIPT / "openui-bridge.tsx"
     yield ROOT / "bridge/openui-styles.css", TRANSCRIPT / "openui-styles.css"
+    yield ROOT / "bridge/openui-state.ts", TRANSCRIPT / "openui-state.ts"
     lib = ROOT / "vendor/thesys-lib"
     for source in sorted(lib.rglob("*")):
         if source.is_file():

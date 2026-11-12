@@ -1,5 +1,13 @@
 # Validation
 
+## Widget state — 12 November 2026
+
+The regression test reproduced an input resetting on the previous Desktop build. The new build keeps a slider change made during a paused reply, even when the rest of the OpenUI source arrives and the reply settles.
+
+The Desktop suite also checks two identical widgets with different values, an identical reply in a different chat with default values, restoration of the first chat after reloading the window, a malformed widget beside a working one, and the Hermes light/dark toggle. Follow-up actions still draft the current value without sending.
+
+During streaming the bridge keeps a bounded in-memory snapshot. After completion it checkpoints only widgets with a Hermes transcript row, keyed by the chat, row, block and source revision. The checkpoint lives in the window's session storage. Old source-only keys are not imported. Live providers, cancel/retry, cross-gateway profiles and restoring values across app launches were not covered.
+
 ## Pinned Desktop build — 12 November 2026
 
 Hermes revision `e3bf4be5df04cf72dab4914b073361c71af1dbe1`, Apple silicon macOS, Node 26.13.1, pnpm 12.15.0, Electron 44.9.3, and Hermes-managed Python 3.14.9.
@@ -11,7 +19,7 @@ Hermes revision `e3bf4be5df04cf72dab4914b073361c71af1dbe1`, Apple silicon macOS,
 
 [See the chart, form and unsent draft in the test window](evidence/openui-transcript.png).
 
-The model reply was scripted. Live provider generation and the Visual mode prompt were not tested. Editing a control before its message settles can still lose the input; the interaction test waits for the reply to finish. Identical blocks can still share persisted state. Image search, street routing and broad component parity remain unverified. The installed Hermes app and its chat profile were not used for the test.
+The model reply was scripted. Live provider generation and the Visual mode prompt were not tested. Image search, street routing and broad component parity remain unverified. The installed Hermes app and its chat profile were not used for the test.
 
 ## Repeat the smoke test
 

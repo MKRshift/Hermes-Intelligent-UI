@@ -1,3 +1,11 @@
-.hermes-openui-original { isolation:isolate; color:var(--ui-text-primary); font-size:14px; }
-.hermes-openui-original iframe {max-width:100%;}
-.hermes-openui-original * {box-sizing:border-box;}
+/* Bind the vendored palette to the active Hermes surface, scoped to the widget. */
+.hermes-openui-original {
+  --openui-foreground: var(--dt-background);
+  --openui-text-neutral-primary: var(--dt-foreground);
+  --openui-text-neutral-secondary: var(--dt-muted-foreground);
+  isolation: isolate;
+  color: var(--dt-foreground);
+  font-size: 14px;
+}
+.hermes-openui-original iframe { max-width: 100%; }
+.hermes-openui-original * { box-sizing: border-box; }

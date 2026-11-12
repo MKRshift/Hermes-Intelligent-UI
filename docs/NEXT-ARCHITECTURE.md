@@ -1,6 +1,6 @@
 # Hermes Intelligent UI: next architecture
 
-Planning audit, 12 November 2026. Findings below describe the original v0.7.0 archive. See [validation](VALIDATION.md) for progress on the pinned source build.
+Planning audit, 12 November 2026. Findings below describe the original v0.7.0 archive. See [validation](VALIDATION.md) for progress on the pinned source build and widget state.
 
 ## Decision
 
@@ -46,7 +46,7 @@ Actions have an explicit allowlist and typed payloads. Continue-conversation ins
 ## Delivery order and acceptance
 
 1. **Reproducible host baseline.** Pin a Hermes revision and resolved runtime dependencies; complete typecheck/build and install/restore tests. Demonstrate one real chart and one form in the Hermes transcript. Preserve the original archive baseline for comparison.
-2. **Stable state and streaming.** Introduce message/block identity, revision-aware persistence, local error handling and native theme. Prove two identical widgets are independent; input survives streaming/reload; switching sessions cannot leak values; cancel/retry and malformed output recover locally.
+2. **Stable state and streaming.** The pinned host now scopes each widget by chat, message and block. Edits stay in memory during streaming; settled widgets can restore a matching revision after a renderer reload in the same window. Invalid roots fall back to source and widgets follow the Hermes theme. Cancel/retry, multiple gateway profiles and persistence across app launches still need their own validation and design.
 3. **Capability-aware generation.** Generate prompts from the library and available services; make Off/Auto/Visual behavior explicit. Off is ordinary chat; Auto may choose plain text; Visual prefers useful UI with an honest fallback. Verify missing services are not advertised as available.
 4. **Images and maps.** Implement host image/routing adapters, source attribution and offline/error handling. Distinguish illustrative straight lines from actual route geometry. No service keys in renderer code or exported documents.
 5. **Custom experiences.** Harden HtmlView before expanding to games/3D. Test blocked host access, forged messages, resize limits, broken scripts and excessive output. Add approved, pinned assets for reproducibility.
