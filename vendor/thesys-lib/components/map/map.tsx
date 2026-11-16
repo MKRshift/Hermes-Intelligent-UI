@@ -1,7 +1,5 @@
 "use client";
 
-import "maplibre-gl/dist/maplibre-gl.css";
-
 import { defineComponent, reactive, useIsStreaming, useStateField } from "@openuidev/react-lang";
 import { useEffect, useId, useRef, useState } from "react";
 import type { GeoJSONSource, Map as MapLibreMap, Marker } from "maplibre-gl";
@@ -30,7 +28,7 @@ function setLine(map: MapLibreMap, points: LatLng[]) {
 function placesOf(markers: unknown, streaming: boolean): Place[] {
   const seen = new Map<string, number>();
   const out: Place[] = [];
-  (Array.isArray(markers) ? markers.flat() : []).forEach((item, order) => {
+  (Array.isArray(markers) ? markers.flat().slice(0, 48) : []).forEach((item, order) => {
     const el = item as { type?: string; partial?: boolean; props?: Record<string, unknown> } | null;
     if (el?.type !== "element" || !el.props || (streaming && el.partial)) return;
     const { label, lat, lng, category, icon } = el.props;
@@ -63,7 +61,11 @@ export const MapMarker = defineComponent({
   component: () => null,
 });
 
-export const MapView = defineComponent({
+export const createMapView = ({
+  load = loadMapLibre,
+  streetRouting = true,
+  inlineExpand = false,
+}: { load?: typeof loadMapLibre; streetRouting?: boolean; inlineExpand?: boolean } = {}) => defineComponent({
   name: "Map",
   props: z.object({
     markers: z.array(MapMarker.ref),
@@ -71,7 +73,7 @@ export const MapView = defineComponent({
     selected: reactive(z.string().optional()),
     height: z.number().optional(),
   }),
-  description: "Street map fitted to its markers. route draws the road path in marker order; selected holds the clicked marker's label.",
+  description: "Map fitted to its markers. route connects stops in marker order; selected holds the clicked marker's label.",
   component: function MapComponent({ props, statementId }) {
     const streaming = useIsStreaming();
     const fallbackId = useId();
@@ -93,38 +95,46 @@ export const MapView = defineComponent({
     const [ready, setReady] = useState(false);
     const [framedKey, setFramedKey] = useState("");
     const [expanded, setExpanded] = useState(false);
-    const [group, setGroup] = useState("all");
+    const [group, setGroup] = useState("");
     const [infoOpen, setInfoOpen] = useState(false);
     const [mapError, setMapError] = useState(false);
     const dark = useColorScheme(container) === "dark";
+    const modal = expanded && !inlineExpand;
     // Phones get a shorter map so it never fills the whole screen.
     const height = `min(${Math.min(720, Math.max(200, props.height ?? 400))}px, max(280px, 82vw))`;
 
     const places = placesOf(props.markers, streaming);
-    const visible = places.filter((p) => group === "all" || p.category === group);
+    const visible = places.filter((p) => !group || p.category === group);
     const categories = Array.from(new Set(places.map((p) => p.category).filter((c): c is string => !!c)));
     const placeSignature = JSON.stringify(places.map((p) => [p.key, p.lat, p.lng, p.icon, p.category, p.order]));
     const routingKey = visible.map((p) => `${p.lng},${p.lat}`).join(";");
-    const streetPoints = useStreetRoute(routingKey, !!props.route);
-    const routeKind = !props.route ? "none" : streetPoints?.length ? "street" : streetPoints === null ? "overview" : "loading";
+    const hasRoute = !!props.route && visible.length > 1;
+    const streetPoints = useStreetRoute(routingKey, hasRoute && streetRouting);
+    const routeKind = !hasRoute ? "none" : streetPoints?.length ? "street" : !streetRouting || streetPoints === null ? "overview" : "loading";
     select.current = (label) => selection.setValue(label);
-    useDialog(container, expanded, () => setExpanded(false));
+    useDialog(container, modal, () => setExpanded(false));
 
     useEffect(() => {
       let active = true;
-      loadMapLibre().then((module) => { if (active) setLib(module); });
+      load().then((module) => { if (active) setLib(module); }).catch(() => { if (active) setMapError(true); });
       return () => { active = false; };
     }, []);
 
     useEffect(() => {
       if (!lib || !surface.current) return;
       // Zoom levels are one lower than Leaflet's: MapLibre uses 512px tiles.
-      const instance = new lib.Map({
-        container: surface.current, style: vectorStyle(dark), center: [0, 20], zoom: 1, minZoom: 0,
-        scrollZoom: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, attributionControl: false,
-        // On a phone a one-finger swipe scrolls the answer instead of getting stuck on the map.
-        cooperativeGestures: window.matchMedia("(pointer: coarse)").matches,
-      });
+      let instance: MapLibreMap;
+      try {
+        instance = new lib.Map({
+          container: surface.current, style: vectorStyle(dark), center: [0, 20], zoom: 1, minZoom: 0,
+          scrollZoom: false, dragRotate: false, pitchWithRotate: false, touchPitch: false, attributionControl: false,
+          // On a phone a one-finger swipe scrolls the answer instead of getting stuck on the map.
+          cooperativeGestures: window.matchMedia("(pointer: coarse)").matches,
+        });
+      } catch {
+        setMapError(true);
+        return;
+      }
       instance.touchZoomRotate.disableRotation();
       instance.addControl(new lib.AttributionControl({ compact: false }), "bottom-left");
       instance.addControl(new lib.NavigationControl({ showCompass: false }), "bottom-right");
@@ -167,7 +177,7 @@ export const MapView = defineComponent({
       map.current.setStyle(vectorStyle(dark), { diff: false });
     }, [dark]);
 
-    useEffect(() => { expandedNow.current = expanded; }, [expanded]);
+    useEffect(() => { expandedNow.current = modal; }, [modal]);
 
     // Reconcile pins with the visible places; existing pins update in place.
     useEffect(() => {
@@ -253,32 +263,35 @@ export const MapView = defineComponent({
     }, [expanded]);
 
     const routeNote = routeKind === "street" ? "The line follows streets (OSRM / OpenStreetMap, driving profile); it is an overview, not turn-by-turn directions."
-      : routeKind === "none" ? "" : "The line joins the places in order. Street routing is loading or unavailable.";
-    const routeStatus = { street: "Street route loaded.", overview: "Street routing unavailable. Showing direct connections.", loading: "Street route loading.", none: "" }[routeKind];
+      : routeKind === "none" ? "" : "The line connects the stops in order. It does not show street directions.";
+    const routeStatus = { street: "Street route loaded.", overview: "Showing direct connections between stops.", loading: "Street route loading.", none: "" }[routeKind];
 
     return (
-      <div className="iui-map-slot" style={{ minHeight: height }}>
+      <div className="iui-map-slot" data-inline-expanded={inlineExpand && expanded ? "" : undefined} style={{ minHeight: height }}>
         <div
           ref={container}
-          className={`iui-map${expanded ? " is-expanded" : ""}`}
-          style={expanded ? undefined : { height }}
-          role={expanded ? "dialog" : "region"}
-          aria-modal={expanded || undefined}
+          className={`iui-map${modal ? " is-expanded" : ""}`}
+          style={modal ? undefined : { height: expanded ? `max(${height}, min(640px, 64vh))` : height }}
+          role={modal ? "dialog" : "region"}
+          aria-modal={modal || undefined}
           aria-label="Map"
-          tabIndex={expanded ? -1 : undefined}
+          tabIndex={modal ? -1 : undefined}
         >
           <div className="iui-map-surface" ref={surface} />
           <div className="iui-map-top-left">
             {categories.length > 1 && (
               <label className="iui-map-pill iui-map-filter">
-                <select aria-label="Filter places" value={group} onChange={(event) => setGroup(event.target.value)}>
-                  <option value="all">All places</option>
+                <select aria-label="Filter places" value={group} onChange={(event) => {
+                  userMoved.current = false;
+                  setGroup(event.target.value);
+                }}>
+                  <option value="">All places</option>
                   {categories.map((category) => <option key={category} value={category}>{category}</option>)}
                 </select>
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
               </label>
             )}
-            <button className="iui-map-pill iui-map-recenter" type="button" aria-label="Show every place" onClick={() => {
+            <button className="iui-map-pill iui-map-recenter" type="button" aria-label="Fit visible places" onClick={() => {
               if (fitPoints.current.length) map.current?.fitBounds(boundsOf(fitPoints.current), { padding: { top: 55, left: 34, bottom: 35, right: 40 }, maxZoom: 14 });
             }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m4.5 4.5 15 5a1 1 0 0 1 0 1.9l-6.1 2-2 6.1a1 1 0 0 1-1.9 0l-5-15z"/></svg></button>
             <button className="iui-map-info" type="button" aria-label="About this map" aria-expanded={infoOpen} onClick={() => setInfoOpen(!infoOpen)}><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="M10 9v5"/><circle cx="10" cy="6.3" r=".6" fill="currentColor" stroke="none"/></svg></button>
@@ -287,9 +300,14 @@ export const MapView = defineComponent({
           {infoOpen && <div className="iui-map-note">Drag to explore and use + and − to zoom. Select a place to highlight it. {routeNote}</div>}
           {routeKind === "overview" && <div className="iui-map-overview">Route overview</div>}
           <span className="iui-map-status" role="status">{routeStatus}</span>
-          {mapError && <div className="iui-map-error" role="status">Map tiles are temporarily unavailable. The places are still shown.</div>}
+          {mapError && <div className="iui-map-error" role="status">
+            {ready ? "Map tiles are unavailable." : "The map could not load."}
+            {!ready && places.length > 0 && <ul>{places.map(place => <li key={place.key}>{place.label}</li>)}</ul>}
+          </div>}
         </div>
       </div>
     );
   },
 });
+
+export const MapView = createMapView();

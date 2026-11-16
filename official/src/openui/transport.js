@@ -68,27 +68,47 @@ function getProgram(snapshot, session, id) {
   return snapshot.get(key(session, id))
 }
 
-// Resolve durable transcript cards through the exact runtime bound to the
-// focused transcript. Don't read an arbitrary session named by model output.
-function replayOpenUI(session, runtime) {
-  if (replays.has(runtime)) return replays.get(runtime)
+// Read the saved transcript without requiring a live chat attachment. Keep
+// the request bound to the focused chat and its owning connection/profile.
+function replayOpenUI(session, runtime, id) {
   const connection = host.state.connectionId?.get()
   const profile = host.state.profile?.get()
   const owner = host.state.focusedSessionOwner?.get()
-  if (owner && ((owner.connectionId ?? null) !== (connection ?? null) || owner.profile !== profile)) {
-    return Promise.resolve()
-  }
-  const request = Promise.resolve().then(() => host.request('session.history', { session_id: runtime }))
-    .then(history => {
-      if (host.state.connectionId?.get() !== connection || host.state.profile?.get() !== profile) return
-      const frames = (history.messages || []).filter(row => row.role === 'assistant' && typeof row.text === 'string')
-        .flatMap(row => programFrames(row.text).filter(frame => frame.complete))
-      publish(runtime, frames, true)
-      if (session !== runtime) publish(session, frames, true)
-    })
+  const useOwnerRoute = owner && ((owner.connectionId || null) !== (connection || null) || owner.profile !== profile)
+  const requestKey = JSON.stringify([owner?.connectionId ?? connection, owner?.profile ?? profile, session, id])
+  if (replays.has(requestKey)) return replays.get(requestKey)
+  const sameRoute = () => host.state.connectionId?.get() === connection && host.state.profile?.get() === profile
+  const fromRows = rows => (Array.isArray(rows) ? rows : [])
+    .filter(row => row.role === 'assistant' && typeof row.text === 'string')
+    .flatMap(row => programFrames(row.text).filter(frame => frame.complete && frame.id === id))
+  const request = Promise.resolve().then(async () => {
+    let read = (method, params) => host.request(method, params)
+    if (useOwnerRoute) {
+      if (!host.profileRoutes || !host.requestProfile) return
+      const routes = await host.profileRoutes()
+      const route = routes.find(item => item.connectionId === owner.connectionId && item.profile === owner.profile)
+      if (!route) return
+      read = (method, params) => host.requestProfile(route, method, params)
+    }
+    let cursor
+    try {
+      do {
+        if (!sameRoute()) return
+        const page = await read('session.transcript', { session_id: session, order: 'latest', limit: 100, ...(cursor ? { cursor } : {}) })
+        if (!sameRoute()) return
+        const frames = fromRows(page.rows)
+        if (frames.length) { publish(session, frames, true); return }
+        if (page.next_cursor === cursor) break
+        cursor = page.next_cursor
+      } while (cursor)
+    } catch { /* Older gateways may only expose the attached session read. */ }
+    if (!runtime || useOwnerRoute || !sameRoute()) return
+    const history = await host.request('session.history', { session_id: runtime })
+    if (sameRoute()) publish(session, fromRows(history.messages), true)
+  })
     .catch(() => {})
-    .finally(() => { if (replays.get(runtime) === request) replays.delete(runtime) })
-  replays.set(runtime, request)
+    .finally(() => { if (replays.get(requestKey) === request) replays.delete(requestKey) })
+  replays.set(requestKey, request)
   return request
 }
 

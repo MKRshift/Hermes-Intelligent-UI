@@ -3,6 +3,7 @@ import { actions } from "./actions";
 import { functions } from "./functions";
 import "./components/theme.css";
 import "./components/components.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./components/map/map.css";
 import { Chart } from "./components/chart";
 import { Carousel, Celebration, Code, Flashcard, MathBlock, Popover, Quote, YouTube } from "./components/extra";

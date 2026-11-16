@@ -6,19 +6,22 @@ import theme from '../../../vendor/thesys-lib/components/theme.css'
 import styles from '../../../vendor/thesys-lib/components/components.css'
 import base from '../../../bridge/openui-styles.css'
 import layout from './layout.css'
+import maplibreStyles from 'maplibre-gl/dist/maplibre-gl.css'
+import mapStyles from '../../../vendor/thesys-lib/components/map/map.css'
 import { pluginContext } from '../shared.js'
 import { library } from './library'
+import { disposeMapWorker } from './map'
 import { ID, getProgram, programs, replayOpenUI } from './transport.js'
 
 const { host, useValue } = sdk
-const widgetStyles = theme + base + `@scope (.hermes-openui-original) { ${styles} }\n` + layout
+const widgetStyles = theme + base + `@scope (.hermes-openui-original) { ${styles}\n${maplibreStyles}\n${mapStyles} }\n` + layout
 
 export function installOpenUIStyles(ctx: { onDispose: (fn: () => void) => void }) {
   if (typeof document === 'undefined') return
   const style = document.createElement('style')
   style.textContent = widgetStyles
   document.head.append(style)
-  ctx.onDispose(() => style.remove())
+  ctx.onDispose(() => { style.remove(); disposeMapWorker() })
 }
 
 function actionHandler(event: ActionEvent, sessionId: string | null) {
@@ -73,20 +76,21 @@ function Card({ id, streaming, sessionId }: { id: string; streaming: boolean; se
   const focusedRuntime = useValue(host.state.focusedSessionId)
   const focusedStored = useValue(host.state.focusedStoredSessionId)
   const [boundRuntime, setBoundRuntime] = useState<string | null>(null)
-  const runtime = sessionId && (sessionId === focusedStored || sessionId === focusedRuntime) ? focusedRuntime : null
+  const focused = !!sessionId && (sessionId === focusedStored || sessionId === focusedRuntime)
+  const runtime = focused ? focusedRuntime : null
   useEffect(() => { if (runtime) setBoundRuntime(runtime) }, [runtime])
   const live = runtime || boundRuntime
   const program = getProgram(snapshot, sessionId, id) || getProgram(snapshot, live, id)
   const [attempted, setAttempted] = useState(false)
   useEffect(() => {
-    if (!runtime || !sessionId || streaming || program?.complete || attempted) return
+    if (!focused || !sessionId || streaming || program?.complete || attempted) return
     let active = true
-    void replayOpenUI(sessionId, runtime).then(() => { if (active) setAttempted(true) })
+    void replayOpenUI(sessionId, runtime, id).then(() => { if (active) setAttempted(true) })
     return () => { active = false }
-  }, [runtime, sessionId, streaming, program?.complete, attempted])
+  }, [focused, runtime, sessionId, id, streaming, program?.complete, attempted])
   if (!program?.code.trim()) {
-    return <div className="hermes-openui-answer" role="status">{streaming || (runtime && !attempted) ? 'Building the interactive answer…' :
-      !runtime && !attempted ? 'Select this chat to load the interactive answer.' :
+    return <div className="hermes-openui-answer" role="status">{streaming || (focused && !attempted) ? 'Building the interactive answer…' :
+      !focused && !attempted ? 'Select this chat to load the interactive answer.' :
       'The interactive answer is missing. Try asking Hermes to regenerate it.'}</div>
   }
   if (!streaming && !program.complete) return <div className="hermes-openui-answer" role="status">The interactive answer ended before it was complete. Try again.</div>

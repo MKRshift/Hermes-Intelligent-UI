@@ -20,6 +20,10 @@
   max-inline-size: 62rem;
 }
 
+.hermes-openui-answer:has(.iui-map-slot[data-inline-expanded]) {
+  max-inline-size: 78rem;
+}
+
 /* Photo grids read as a strip of images, without a second frame around each. */
 .hermes-openui-answer .iui-grid > .iui-card:has(> .iui-image:first-child) {
   border: 0;

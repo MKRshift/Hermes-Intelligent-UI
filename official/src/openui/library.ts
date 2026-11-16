@@ -12,6 +12,7 @@ import { Box, Card, Col, Divider, Form, createGrid, Row, Spacer } from '../../..
 import { Icon, Photo } from '../../../vendor/thesys-lib/components/media'
 import { svgComponents } from '../../../vendor/thesys-lib/components/svg'
 import { radiusSchema } from '../../../vendor/thesys-lib/components/style'
+import { MapMarker, MapView } from './map'
 import { Table } from '../../../vendor/thesys-lib/components/table'
 import {
   Badge, Caption, Label, Link, List, ListItem, Markdown, Text, Title
@@ -43,7 +44,7 @@ export const library = createLibrary({
     Col, Row, Box, Grid, Card, Divider, Spacer, Title, Text, Caption, Label, Badge,
     Link, List, ListItem, Markdown, Button, IconButton, Pressable, Input, TextArea,
     Select, SegmentedControl, Slider, Checkbox, RadioGroup, DatePicker, Timer, Form,
-    Image, Icon, Table, Chart, ...svgComponents
+    Image, Icon, Table, Chart, MapView, MapMarker, ...svgComponents
   ],
   functions,
   actions

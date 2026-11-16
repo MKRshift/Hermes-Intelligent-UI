@@ -12,17 +12,33 @@ const listeners = new Map(), contributions = new Map()
 const runtime = 'runtime-a', stored = 'stored-a'
 let history = []
 let apiReads = 0
+const owner = atom(null)
+const secondaryRoute = { connectionId: 'local', profile: 'another', targetProfile: 'another', mode: 'local' }
 const sdk = {
   atom, useValue: store => store.get(), useTheme: () => ({ renderedMode: 'dark' }),
   COMPOSER_AREAS: { actions: 'composer.actions', top: 'composer.top', middleware: 'composer.middleware' },
   TRANSCRIPT_DIRECTIVE_AREA: 'transcript.directives',
   host: {
-    state: { focusedSessionId: atom(runtime), focusedStoredSessionId: atom(stored) },
+    state: {
+      focusedSessionId: atom(runtime), focusedStoredSessionId: atom(stored),
+      connectionId: atom('local'), profile: atom('default'), focusedSessionOwner: owner
+    },
+    async profileRoutes() { return [secondaryRoute] },
+    async requestProfile(route, method, args) {
+      assert.equal(route, secondaryRoute)
+      assert.equal(method, 'session.transcript')
+      assert.equal(args.session_id, stored)
+      return { rows: history }
+    },
     async request(method, args) {
-      assert.equal(method, 'session.history')
-      assert.equal(args.session_id, runtime)
       apiReads++
-      return { messages: history }
+      if (method === 'session.history') {
+        assert.equal(args.session_id, runtime)
+        return { messages: history }
+      }
+      assert.equal(method, 'session.transcript')
+      assert.equal(args.session_id, stored)
+      return { rows: history }
     }
   }
 }
@@ -85,11 +101,26 @@ history = [
   { role: 'user', text: secondText.replace('Event budget', 'User impersonation') },
   { role: 'assistant', text: secondText }
 ]
-await Promise.all([replayOpenUI(stored, runtime), replayOpenUI(stored, runtime)])
+await Promise.all([replayOpenUI(stored, null, second), replayOpenUI(stored, null, second)])
 assert.equal(apiReads, 1)
 assert.equal(getProgram(programs.get(), stored, second).code, finalProgram + '\n')
 const otherId = 'beefb33fdeadb33f'
 history = [{ role: 'user', text: answer.replaceAll(id, otherId) }]
-await replayOpenUI(stored, runtime)
+await replayOpenUI(stored, runtime, otherId)
 assert.equal(getProgram(programs.get(), stored, otherId), undefined)
-console.log('OpenUI: complete and streamed native transport, original components and state, scoped transcript replay passed.')
+const mapId = 'deedb33fdeadb33f'
+const mapProgram = `root = Col([Title("Landmarks"), Map([MapMarker("Golden Gate Bridge", 37.8199, -122.4783, "Parks"), MapMarker("Pier 39", 37.8087, -122.4098, "Waterfront")], true, $stop)])
+$stop = ""`
+const mapText = `::openui{id="${mapId}"}\n\n<!--openui:${mapId}\n${mapProgram}\n-->`
+owner.set(secondaryRoute)
+history = [{ role: 'assistant', text: mapText }]
+const previousReads = apiReads
+await replayOpenUI(stored, null, mapId)
+assert.equal(apiReads, previousReads, 'A saved card must use its owning profile, not the active gateway')
+assert.equal(getProgram(programs.get(), stored, mapId).code, mapProgram + '\n')
+const mapHtml = renderToStaticMarkup(render({ attrs: { id: mapId }, streaming: false, sessionId: stored }))
+assert.match(mapHtml, /aria-label="Map"/)
+assert.match(mapHtml, /aria-label="Filter places"/)
+assert.match(mapHtml, /Route overview/)
+assert.match(mapHtml, />Expand</)
+console.log('OpenUI: native chart, table, map, streaming and owner-routed saved-card replay passed.')
